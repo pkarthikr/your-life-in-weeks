@@ -13,8 +13,8 @@ import {
   parseISODate,
   toISODate,
   formatDate,
+  formatWhen,
   startOfToday,
-  weekPosition,
   weekStart,
   lifeStats,
   eventsByWeek,
@@ -197,10 +197,8 @@ function renderSettings(birth, today) {
 function eventItem(event, birth) {
   const item = $('event-item').content.firstElementChild.cloneNode(true);
   const date = parseISODate(event.date);
-  const pos = weekPosition(birth, date);
   item.querySelector('.li-label').textContent = event.label;
-  item.querySelector('.li-meta').textContent =
-    (date ? formatDate(date) : event.date) + (pos ? ` · age ${pos.row}, week ${pos.col + 1}` : '');
+  item.querySelector('.li-meta').textContent = date ? formatWhen(birth, date) : event.date;
   const remove = item.querySelector('.x');
   remove.dataset.remove = String(event.id);
   remove.setAttribute('aria-label', `Remove ${event.label}`);
@@ -215,9 +213,7 @@ function showPopover(cell) {
   if (!list || hoverIndex === index) return;
   hoverIndex = index;
 
-  const first = parseISODate(list[0].date);
-  const pos = weekPosition(currentBirth, first);
-  $('pop-when').textContent = formatDate(first) + (pos ? ` · age ${pos.row}` : '');
+  $('pop-when').textContent = formatWhen(currentBirth, parseISODate(list[0].date));
   $('pop-title').textContent = list.map((e) => e.label).join('\n');
 
   const rows = $('rows');

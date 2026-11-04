@@ -61,6 +61,15 @@ export function weekPosition(birth, date) {
   return { row, col: Math.min(WEEKS_PER_YEAR - 1, Math.floor(days / 7)) };
 }
 
+/**
+ * A date and the week it falls in, like `Mar 2, 2015 · age 24, week 38`
+ * (week counted from 1). Just the date if it is before the birthday.
+ */
+export function formatWhen(birth, date) {
+  const pos = weekPosition(birth, date);
+  return formatDate(date) + (pos ? ` · age ${pos.row}, week ${pos.col + 1}` : '');
+}
+
 /** First day of the week at `row`/`col` for someone born on `birth`. */
 export function weekStart(birth, row, col) {
   return addDays(addYears(birth, row), col * 7);
