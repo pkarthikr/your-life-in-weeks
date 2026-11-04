@@ -72,7 +72,7 @@ function renderWeeks(birth, today) {
   currentBirth = birth;
   $('legend-events').hidden = events.size === 0;
 
-  // Rebuilding 4,680 cells is cheap but not free; only do it when the
+  // Rebuilding 5,200 cells is cheap but not free; only do it when the
   // inputs that shape the grid change.
   const key = [toISODate(birth), stats.nowIndex, JSON.stringify(data.events)].join('|');
   if (key !== gridKey) {

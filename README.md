@@ -1,6 +1,6 @@
 # Life in Weeks
 
-Your whole life on one page: one square per week, one row per year, 90 years.
+Your whole life on one page: one square per week, one row per year, 100 years.
 
 Inspired by Tim Urban's [Your Life in Weeks](https://waitbutwhy.com/2014/05/life-weeks.html) on Wait But Why.
 

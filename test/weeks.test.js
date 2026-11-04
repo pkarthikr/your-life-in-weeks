@@ -62,6 +62,14 @@ test('weekStart is the inverse of weekPosition', () => {
   }
 });
 
+test('the grid covers 100 years', () => {
+  assert.equal(YEARS, 100);
+  const s = lifeStats(d('1931-11-10'), d('2026-11-04')); // 94 years old
+  assert.equal(s.total, 5200);
+  assert.equal(s.age, 94);
+  assert.ok(s.ahead > 0);
+});
+
 test('lifeStats for someone born today', () => {
   const s = lifeStats(d('2026-11-04'), d('2026-11-04'));
   assert.equal(s.total, YEARS * 52);
@@ -96,8 +104,10 @@ test('eventsByWeek groups, sorts and drops out-of-range events', () => {
     { id: 3, date: '1989-12-31', label: 'Before birth' },
     { id: 4, date: '2090-01-01', label: 'Past the grid' },
     { id: 5, date: 'garbage', label: 'Bad date' },
+    { id: 6, date: '2089-12-31', label: 'Last week of the grid' },
   ]);
-  assert.equal(map.size, 1);
+  assert.equal(map.size, 2);
+  assert.ok(map.has(YEARS * 52 - 1));
   const [index, list] = [...map][0];
   const pos = weekPosition(b, d('2015-03-02'));
   assert.equal(index, pos.row * 52 + pos.col);

@@ -4,7 +4,7 @@
 // Each row has 52 weeks; the last week of a row absorbs the 1–2 leftover
 // days so every row lines up with the next birthday.
 
-export const YEARS = 90;
+export const YEARS = 100;
 export const WEEKS_PER_YEAR = 52;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
