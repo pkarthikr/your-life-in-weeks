@@ -208,7 +208,8 @@ a { color: inherit; }
 .ax,
 .statn,
 .pop-when,
-.li-meta { font-family: 'Geist Mono', ui-monospace, monospace; }
+.li-meta,
+.fmt-size { font-family: 'Geist Mono', ui-monospace, monospace; }
 
 /* ---- Nav --------------------------------------------------------------- */
 
@@ -597,11 +598,73 @@ a { color: inherit; }
   transform: rotate(45deg);
 }
 
-/* ---- Post as a story --------------------------------------------------- */
+/* ---- Share pictures ---------------------------------------------------- */
 
-.hero-btn {
-  align-self: flex-start;
-  margin-top: 6px;
+/* One button per picture format: four across, two on phones. */
+.formats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fmt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.fmt:hover:not(:disabled) { background: var(--line); }
+
+.fmt:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.fmt:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* The picture's shape, sized by app.js to fit this box. */
+.fmt-box {
+  width: 36px;
+  height: 28px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fmt-shape {
+  box-sizing: border-box;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+}
+
+.fmt-name {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.fmt-size {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+@media (max-width: 520px) {
+  .formats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .dlg {
@@ -635,12 +698,15 @@ a { color: inherit; }
   margin-right: -14px;
 }
 
-/* The preview keeps the picture's 9:16 shape at any screen size. */
+.dlg[data-shape="wide"] { width: min(640px, calc(100vw - 32px)); }
+
+/* The preview keeps the picture's shape (--w by --h, set by app.js) at any
+   screen size: as wide as the dialog, but no taller than 60% of the screen. */
 .shot {
   align-self: center;
-  height: min(60vh, 520px);
-  height: min(60dvh, 520px);
-  aspect-ratio: 9 / 16;
+  width: min(100%, calc(min(60vh, 520px) * var(--w) / var(--h)));
+  width: min(100%, calc(min(60dvh, 520px) * var(--w) / var(--h)));
+  aspect-ratio: var(--w) / var(--h);
   display: flex;
   align-items: center;
   justify-content: center;

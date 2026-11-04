@@ -11,7 +11,7 @@ Life in Weeks is a static web page. There is no server, no database and no accou
 - Everything runs in your browser.
 - Your birthday, your important weeks and your theme are saved in your browser's `localStorage` under the key `liw:v1`. They never leave your device.
 - A different browser or device starts fresh. Clearing this site's data in your browser deletes everything.
-- **Post as a story** draws its picture in your browser too. Nothing is uploaded; you save or share the picture yourself.
+- The share pictures (Settings → **Share your weeks**) are drawn in your browser too. Nothing is uploaded; you save or share the picture yourself.
 
 The only network requests are for the page's own files. That includes the Geist fonts, which are served with the site rather than from Google Fonts.
 
@@ -29,7 +29,7 @@ That runs `python3 -m http.server 8000 --directory site`. Then open http://local
 
 ## Tests
 
-The date math, the Settings rules, the story picture's layout and drawing, and the storage layer have unit tests that use Node's built-in test runner (Node 20 or later):
+The date math, the Settings rules, the share pictures' layout and drawing, and the storage layer have unit tests that use Node's built-in test runner (Node 20 or later):
 
 ```bash
 npm test
@@ -53,7 +53,7 @@ site/            the whole app, served as-is
   js/weeks.js    pure date math for the grid (no DOM)
   js/colors.js   the colors an important week can have (their shades are in styles.css)
   js/settings.js pure rules for Settings: checking dates, adding and removing important weeks
-  js/story.js    the story picture: its layout and canvas drawing (no DOM)
+  js/picture.js  the share pictures: their formats, layout and canvas drawing (no DOM)
   js/storage.js  localStorage read/write
 test/            unit tests (node --test)
 ```
@@ -63,8 +63,21 @@ test/            unit tests (node --test)
 Both screens are on one page; the address picks which one shows, so the browser's back button and reload work as expected.
 
 - **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks show in the color you picked for them; hover one for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. If it is also an important week, it keeps that week's color inside the ring. Before a birthday is saved, it asks you to add one.
-  - **Post as a story** makes a 1080 × 1920 PNG of your whole grid, sized for Instagram stories, in your current theme. Save it, or, where the browser supports sharing files (most phones), share it straight to Instagram or Photos. Important weeks show in their colors but their labels are left off, since the picture is meant to be posted. The week you were born is ringed, as on the page. The site's address is printed at the bottom so friends can make their own.
 - **Settings** (`#settings`): your birthday, the light or dark theme, and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
+  - **Share your weeks** makes a PNG of your whole grid in your current theme, sized for where you'll post it. Save it, or, where the browser supports sharing files (most phones), share it straight to the app. It needs a birthday first.
+
+### Share pictures
+
+| Button | Size | Grid |
+|---|---|---|
+| Instagram story | 1080 × 1920 (9:16) | one row per year, as on the page |
+| Instagram post | 1080 × 1350 (4:5) | one column per year, life running left to right |
+| LinkedIn post | 1200 × 1200 (1:1) | one column per year |
+| X / Twitter post | 1600 × 900 (16:9) | one column per year |
+
+Each picture has the weeks lived and ahead, the grid with ages every ten years, a legend and the site's address, so friends can make their own. The grid fills the picture's width, so weeks can come out wider than they are tall. Important weeks show in their colors but their labels are left off, since the picture is meant to be posted; the week you were born is ringed, as on the page. The story keeps its text clear of the top and bottom, where Instagram draws the poster's name and the reply bar.
+
+To add a format, add an entry to `FORMATS` in `js/picture.js` (its size, margins, type sizes and which way the grid runs); its button and layout follow from that.
 
 ### Colors for important weeks
 

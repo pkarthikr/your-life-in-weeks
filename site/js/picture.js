@@ -1,58 +1,74 @@
-// The story picture: the whole week grid on one tall image, sized for
-// Instagram stories (1080 × 1920). It is drawn on a canvas in the browser;
-// nothing is uploaded.
+// The share pictures: the whole week grid on one image, sized for a story or
+// post on Instagram, a LinkedIn post or a post on X. Drawn on a canvas in
+// the browser; nothing is uploaded.
 //
-// storyLayout, storyText and siteAddress are pure, so they are unit tested.
-// drawStory only uses the 2D canvas context it is given.
+// pictureLayout, pictureText and siteAddress are pure, so they are unit
+// tested. drawPicture only uses the 2D canvas context it is given.
 
 import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, cellState } from './weeks.js';
 import { COLORS, weekColor } from './colors.js';
 
 /**
- * Picture formats. Only the vertical story for now. The layout is worked out
- * from a format's size, so another format is another entry here.
+ * The picture formats, in the order the Share buttons show them. Each is
+ * laid out from its own size, so another format is another entry here.
  *
- * The grid fills the width between the side margins. Its height is what is
- * left after the text, so weeks come out wider than they are tall.
+ * - `years`: 'rows' puts one year per row, as on the page, for tall
+ *   pictures; 'columns' turns the grid on its side, one year per column with
+ *   life running left to right, for square and wide ones.
+ * - `margin`: space kept clear of text. A story's top and bottom are large
+ *   because Instagram draws the poster's name over the top of a story and
+ *   the reply bar over the bottom.
+ * - `type`: font sizes in pixels of the picture. `titleLines` is 2 for
+ *   "N weeks lived." over "N weeks ahead.", or 1 for both on one line.
+ * - `footerBeside`: put the site's address at the right end of the legend's
+ *   line instead of on a line of its own.
  *
- * Text stays out of `safeTop` and `safeBottom`: Instagram draws the poster's
- * name over the top of a story and the reply bar over the bottom.
+ * The grid fills the width between the side margins. Weeks are as tall as
+ * the height left after the text allows, so they can come out wider than
+ * they are tall.
  */
 export const FORMATS = Object.freeze({
-  story: Object.freeze({ id: 'story', width: 1080, height: 1920, safeTop: 180, safeBottom: 180, sideMargin: 72 }),
+  story: Object.freeze({
+    id: 'story', name: 'Instagram story', sizedFor: 'Instagram stories',
+    width: 1080, height: 1920, years: 'rows',
+    margin: { top: 180, bottom: 180, side: 72 },
+    type: { eyebrow: 26, title: 60, year: 18, legend: 24, footer: 22 }, titleLines: 2,
+  }),
+  post: Object.freeze({
+    id: 'post', name: 'Instagram post', sizedFor: 'Instagram posts',
+    width: 1080, height: 1350, years: 'columns',
+    margin: { top: 96, bottom: 96, side: 72 },
+    type: { eyebrow: 26, title: 96, year: 18, legend: 24, footer: 22 }, titleLines: 2,
+  }),
+  linkedin: Object.freeze({
+    id: 'linkedin', name: 'LinkedIn post', sizedFor: 'LinkedIn posts',
+    width: 1200, height: 1200, years: 'columns',
+    margin: { top: 96, bottom: 96, side: 72 },
+    type: { eyebrow: 28, title: 104, year: 20, legend: 26, footer: 24 }, titleLines: 2,
+  }),
+  x: Object.freeze({
+    id: 'x', name: 'X / Twitter post', sizedFor: 'posts on X (Twitter)',
+    width: 1600, height: 900, years: 'columns',
+    margin: { top: 64, bottom: 64, side: 80 },
+    type: { eyebrow: 26, title: 64, year: 20, legend: 26, footer: 24 }, titleLines: 1, footerBeside: true,
+  }),
 });
 
 const SANS = "'Geist', system-ui, sans-serif";
 const MONO = "'Geist Mono', ui-monospace, monospace";
-
-// Type sizes and line heights, and the space between blocks, in pixels of
-// the picture.
-const TYPE = {
-  eyebrow: { size: 26, line: 32 },
-  title: { size: 60, line: 66 },
-  year: { size: 18 },
-  legend: { size: 24, line: 30 },
-  footer: { size: 22, line: 28 },
-};
-const SPACE = { eyebrow: 26, title: 48, grid: 40, legend: 14 };
-const YEAR_GUTTER = 14; // between a year label and the grid
 const MARK = { square: 7, gap: 3, text: 14 }; // the brand mark before the eyebrow
 
-/** Years between the labels down the left of the grid. */
+/** Years between the age labels along the grid. */
 export const YEAR_LABEL_EVERY = 10;
 
-/** The fonts the picture uses, to load before drawing. */
-export const STORY_FONTS = [
-  `500 ${TYPE.title.size}px ${SANS}`,
-  `400 ${TYPE.legend.size}px ${SANS}`,
-  `400 ${TYPE.eyebrow.size}px ${MONO}`,
-];
+/** The fonts the pictures use, to load before drawing. */
+export const PICTURE_FONTS = [`500 60px ${SANS}`, `400 24px ${SANS}`, `400 24px ${MONO}`];
 
 const fmtInt = (n) => n.toLocaleString('en-US');
 const weeks = (n) => `${fmtInt(n)} ${n === 1 ? 'week' : 'weeks'}`;
 
 /** The words on the picture. `stats` is lifeStats(). */
-export function storyText(stats) {
+export function pictureText(stats) {
   return {
     eyebrow: 'My life in weeks',
     lived: `${weeks(stats.lived)} lived.`,
@@ -76,61 +92,87 @@ export function siteAddress(href) {
 }
 
 /**
- * The largest whole-pixel grid that fits in `maxWidth` × `maxHeight`.
- * Weeks are as tall as the height allows, then as wide as the width allows
- * (never narrower than tall), so the grid fills the width. Rows get a
- * little more space between them than columns where it fits, as on the
- * page, so each year reads as a line.
+ * The largest whole-pixel grid of `cols` × `rows` weeks that fits in
+ * `maxWidth` × `maxHeight`. Weeks are as tall as the height allows, then as
+ * wide as the width allows (never narrower than tall), so the grid fills
+ * the width. The gap between weeks is a fifth of their height, or a pixel
+ * less if that lets them be taller, but never under an eighth of it, so
+ * the weeks stay apart.
  */
 function fitGrid(maxWidth, maxHeight, cols, rows) {
   for (let cellH = 40; cellH >= 1; cellH--) {
-    const colGap = Math.max(1, Math.round(cellH * 0.2));
-    const cellW = Math.floor((maxWidth - (cols - 1) * colGap) / cols);
-    if (cellW < cellH) continue;
-    for (const rowGap of [Math.max(colGap, Math.round(cellH * 0.3)), colGap]) {
-      const height = rows * cellH + (rows - 1) * rowGap;
-      if (height <= maxHeight) {
-        const width = cols * cellW + (cols - 1) * colGap;
-        return { cols, rows, cellW, cellH, colGap, rowGap, width, height };
+    const gap = Math.max(1, Math.round(cellH * 0.2));
+    for (const g of new Set([gap, Math.max(1, gap - 1, Math.ceil(cellH / 8))])) {
+      const cellW = Math.floor((maxWidth - (cols - 1) * g) / cols);
+      const height = rows * cellH + (rows - 1) * g;
+      if (cellW >= cellH && height <= maxHeight) {
+        return { cols, rows, cellW, cellH, colGap: g, rowGap: g, width: cols * cellW + (cols - 1) * g, height };
       }
     }
   }
   throw new Error('The picture is too small for the grid.');
 }
 
-/**
- * Where everything goes on the picture. Text `y` values are the middle of
- * the line. The grid is centred across the picture and everything is
- * centred as one block between the safe zones. Leave out the footer when
- * there is no site address to print.
- */
-export function storyLayout(format = FORMATS.story, { years = YEARS, footer = true } = {}) {
-  const { width, height, safeTop, safeBottom, sideMargin } = format;
-  const head = TYPE.eyebrow.line + SPACE.eyebrow + 2 * TYPE.title.line + SPACE.title;
-  const foot = SPACE.grid + TYPE.legend.line + (footer ? SPACE.legend + TYPE.footer.line : 0);
-  const room = height - safeTop - safeBottom;
+const lineOf = (size) => Math.round(size * 1.25);
+const titleLineOf = (size) => Math.round(size * 1.1);
 
-  const grid = fitGrid(width - 2 * sideMargin, room - head - foot, WEEKS_PER_YEAR, years);
+/**
+ * Where everything goes on the picture, from top to bottom: eyebrow, title,
+ * grid (with the age labels beside or below it), legend and site address.
+ * Text `y` values are the middle of the line. The grid is centred across the
+ * picture and everything is centred as one block between the margins.
+ * Leave out the footer when there is no site address to print.
+ */
+export function pictureLayout(format = FORMATS.story, { years = YEARS, footer = true } = {}) {
+  const { width, height, margin, type, titleLines } = format;
+  const byColumns = format.years === 'columns';
+  const footerLine = footer && !format.footerBeside;
+
+  const space = {
+    eyebrow: type.eyebrow,
+    title: Math.round(type.title * 0.8),
+    grid: Math.round(type.legend * 1.6),
+    ages: Math.round(type.year * 0.6), // between the grid and the ages below it
+    legend: Math.round(type.legend * 0.6),
+  };
+  const agesBelow = byColumns ? space.ages + lineOf(type.year) : 0;
+  const head = lineOf(type.eyebrow) + space.eyebrow + titleLines * titleLineOf(type.title) + space.title;
+  const foot = agesBelow + space.grid + lineOf(type.legend) + (footerLine ? space.legend + lineOf(type.footer) : 0);
+  const room = height - margin.top - margin.bottom;
+
+  const [cols, rows] = byColumns ? [years, WEEKS_PER_YEAR] : [WEEKS_PER_YEAR, years];
+  const grid = fitGrid(width - 2 * margin.side, room - head - foot, cols, rows);
+  grid.byColumns = byColumns;
   grid.x = Math.round((width - grid.width) / 2);
 
-  let y = safeTop + Math.floor((room - head - grid.height - foot) / 2);
+  let y = margin.top + Math.floor((room - head - grid.height - foot) / 2);
   const line = (h) => {
     const middle = y + h / 2;
     y += h;
     return middle;
   };
 
-  const eyebrow = { y: line(TYPE.eyebrow.line), size: TYPE.eyebrow.size };
-  y += SPACE.eyebrow;
-  const title = { y: [line(TYPE.title.line), line(TYPE.title.line)], size: TYPE.title.size };
-  y += SPACE.title;
+  const eyebrow = { y: line(lineOf(type.eyebrow)), size: type.eyebrow };
+  y += space.eyebrow;
+  const titleYs = [];
+  for (let i = 0; i < titleLines; i++) titleYs.push(line(titleLineOf(type.title)));
+  y += space.title;
   grid.y = y;
-  y += grid.height + SPACE.grid;
-  const legend = { y: line(TYPE.legend.line), size: TYPE.legend.size };
-  let footerLine = null;
-  if (footer) {
-    y += SPACE.legend;
-    footerLine = { y: line(TYPE.footer.line), size: TYPE.footer.size };
+  y += grid.height;
+  let ages;
+  if (byColumns) {
+    y += space.ages;
+    ages = { along: 'below', y: line(lineOf(type.year)), size: type.year, every: YEAR_LABEL_EVERY };
+  } else {
+    ages = { along: 'left', x: grid.x - Math.round(type.year * 0.8), size: type.year, every: YEAR_LABEL_EVERY };
+  }
+  y += space.grid;
+  const legend = { y: line(lineOf(type.legend)), size: type.legend };
+  let footerAt = null;
+  if (footer && format.footerBeside) footerAt = { y: legend.y, size: type.footer, beside: true };
+  else if (footer) {
+    y += space.legend;
+    footerAt = { y: line(lineOf(type.footer)), size: type.footer, beside: false };
   }
 
   return {
@@ -139,18 +181,22 @@ export function storyLayout(format = FORMATS.story, { years = YEARS, footer = tr
     left: grid.x,
     textWidth: grid.width,
     eyebrow,
-    title,
+    title: { y: titleYs, size: type.title },
     grid,
-    years: { x: grid.x - YEAR_GUTTER, size: TYPE.year.size, every: YEAR_LABEL_EVERY },
+    ages,
     legend,
-    footer: footerLine,
+    footer: footerAt,
   };
 }
 
-/** The top-left corner, width and height of week `index` on the grid. */
+/**
+ * The top-left corner, width and height of week `index` (counted from the
+ * week you were born) on the grid, whichever way the grid runs.
+ */
 export function cellBox(grid, index) {
-  const row = Math.floor(index / grid.cols);
-  const col = index % grid.cols;
+  const year = Math.floor(index / WEEKS_PER_YEAR);
+  const week = index % WEEKS_PER_YEAR;
+  const [col, row] = grid.byColumns ? [year, week] : [week, year];
   return {
     x: grid.x + col * (grid.cellW + grid.colGap),
     y: grid.y + row * (grid.cellH + grid.rowGap),
@@ -233,7 +279,7 @@ function drawMark(ctx, x, y, colors) {
 }
 
 /**
- * Draw the story picture on `ctx`, whose canvas is `format.width` ×
+ * Draw the picture for `format` on `ctx`, whose canvas is `format.width` ×
  * `format.height`.
  *
  * - `stats`: lifeStats() for today
@@ -247,10 +293,10 @@ function drawMark(ctx, x, y, colors) {
  * picture is meant to be posted, the labels are private. The week you were
  * born is ringed in the this-week color, as on the page.
  */
-export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, site = '' }) {
-  const layout = storyLayout(format, { years: stats.years, footer: Boolean(site) });
+export function drawPicture(ctx, { format = FORMATS.story, stats, events, colors, site = '' }) {
+  const layout = pictureLayout(format, { years: stats.years, footer: Boolean(site) });
   const { grid } = layout;
-  const text = storyText(stats);
+  const text = pictureText(stats);
 
   ctx.fillStyle = colors.bg;
   ctx.fillRect(0, 0, layout.width, layout.height);
@@ -263,26 +309,38 @@ export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, 
   ctx.fillStyle = colors.muted;
   spacedText(ctx, text.eyebrow.toUpperCase(), layout.left + markWidth + MARK.text, layout.eyebrow.y, layout.eyebrow.size * 0.08);
 
-  // Title, shrunk if a long number would run past the grid.
+  // Title: lived over ahead, or both on one line. Shrunk if a long number
+  // would run past the grid.
   const titleFont = (s) => `500 ${s}px ${SANS}`;
   const titleSpacing = 'letterSpacing' in ctx;
-  const titleSize = fitFont(ctx, titleFont, layout.title.size, layout.textWidth, () =>
-    Math.max(ctx.measureText(text.lived).width, ctx.measureText(text.ahead).width),
-  );
+  const oneLine = layout.title.y.length === 1;
+  const titleWidth = () =>
+    oneLine
+      ? ctx.measureText(`${text.lived} ${text.ahead}`).width
+      : Math.max(ctx.measureText(text.lived).width, ctx.measureText(text.ahead).width);
+  const titleSize = fitFont(ctx, titleFont, layout.title.size, layout.textWidth, titleWidth);
   if (titleSpacing) ctx.letterSpacing = `${-titleSize * 0.025}px`;
   ctx.fillStyle = colors.text;
   ctx.fillText(text.lived, layout.left, layout.title.y[0]);
   ctx.fillStyle = colors.muted;
-  ctx.fillText(text.ahead, layout.left, layout.title.y[1]);
+  if (oneLine) ctx.fillText(text.ahead, layout.left + ctx.measureText(`${text.lived} `).width, layout.title.y[0]);
+  else ctx.fillText(text.ahead, layout.left, layout.title.y[1]);
   if (titleSpacing) ctx.letterSpacing = '0px';
 
-  // Ages down the left.
-  ctx.font = `400 ${layout.years.size}px ${MONO}`;
+  // Ages: down the left of a grid of rows, or along the bottom of a grid of
+  // columns, at the start of each decade.
+  const { ages } = layout;
+  ctx.font = `400 ${ages.size}px ${MONO}`;
   ctx.fillStyle = colors.muted;
-  ctx.textAlign = 'right';
-  for (let row = 0; row < grid.rows; row += layout.years.every) {
-    const box = cellBox(grid, row * grid.cols);
-    ctx.fillText(String(row), layout.years.x, box.y + box.h / 2);
+  for (let age = 0; age < stats.years; age += ages.every) {
+    const box = cellBox(grid, age * WEEKS_PER_YEAR);
+    if (ages.along === 'left') {
+      ctx.textAlign = 'right';
+      ctx.fillText(String(age), ages.x, box.y + box.h / 2);
+    } else {
+      ctx.textAlign = 'left';
+      ctx.fillText(String(age), box.x, ages.y);
+    }
   }
   ctx.textAlign = 'left';
 
@@ -325,7 +383,25 @@ export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, 
   ringBox(ctx, { x: birthBox.x - birthGrow, y: birthBox.y - birthGrow, w: birthBox.w + 2 * birthGrow, h: birthBox.h + 2 * birthGrow }, radius + birthGrow, birthRing);
   fillCells(ctx, grid, [BIRTH_WEEK], birthColor, birthGrow);
 
-  // Legend, shrunk to the grid's width if it has to be. Important weeks get
+  // The site's address, at the right end of the legend's line or on a line
+  // of its own below it.
+  const footerFont = (s) => `400 ${s}px ${MONO}`;
+  let footerRoom = 0;
+  if (layout.footer) {
+    const max = layout.footer.beside ? layout.textWidth / 2 : layout.textWidth;
+    fitFont(ctx, footerFont, layout.footer.size, max, () => ctx.measureText(site).width);
+    ctx.fillStyle = colors.muted;
+    if (layout.footer.beside) {
+      ctx.textAlign = 'right';
+      ctx.fillText(site, layout.left + layout.textWidth, layout.footer.y);
+      ctx.textAlign = 'left';
+      footerRoom = ctx.measureText(site).width + layout.legend.size * 2;
+    } else {
+      ctx.fillText(site, layout.left, layout.footer.y);
+    }
+  }
+
+  // Legend, shrunk to the room it has if it has to be. Important weeks get
   // one swatch per color on the grid, side by side, as on the page. Born's
   // swatch is ringed like the week.
   const items = [
@@ -346,7 +422,7 @@ export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, 
       (sum, [label, shades, ringed]) => sum + swatchesWidth(s, shades.length, ringed) + s * 0.45 + ctx.measureText(label).width,
       (items.length - 1) * s * 1.1,
     );
-  const legendSize = fitFont(ctx, legendFont, layout.legend.size, layout.textWidth, legendWidth);
+  const legendSize = fitFont(ctx, legendFont, layout.legend.size, layout.textWidth - footerRoom, legendWidth);
   const swatch = swatchSize(legendSize);
   let x = layout.left;
   for (const [label, shades, ringed] of items) {
@@ -365,13 +441,5 @@ export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, 
     ctx.fillStyle = colors.muted;
     ctx.fillText(label, x, layout.legend.y);
     x += ctx.measureText(label).width + legendSize * 1.1;
-  }
-
-  // Where to make your own.
-  if (layout.footer) {
-    const footerFont = (s) => `400 ${s}px ${MONO}`;
-    fitFont(ctx, footerFont, layout.footer.size, layout.textWidth, () => ctx.measureText(site).width);
-    ctx.fillStyle = colors.muted;
-    ctx.fillText(site, layout.left, layout.footer.y);
   }
 }
