@@ -49,6 +49,7 @@ site/            the whole app, served as-is
   favicon.svg
   js/app.js      rendering and events for the Weeks and Settings screens
   js/weeks.js    pure date math for the grid (no DOM)
+  js/colors.js   the colors an important week can have (their shades are in styles.css)
   js/settings.js pure rules for Settings: checking dates, adding and removing important weeks
   js/storage.js  localStorage read/write
 test/            unit tests (node --test)
@@ -58,5 +59,9 @@ test/            unit tests (node --test)
 
 Both screens are on one page; the address picks which one shows, so the browser's back button and reload work as expected.
 
-- **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks are highlighted; hover one for details. Before a birthday is saved, it asks you to add one.
-- **Settings** (`#settings`): your birthday, the light or dark theme, and your important weeks (add a date and what happened, or remove one). Every change is saved straight away, in this browser only.
+- **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks show in the color you picked for them; hover one for details. If two important dates fall in the same week, the square takes the earlier one's color. Before a birthday is saved, it asks you to add one.
+- **Settings** (`#settings`): your birthday, the light or dark theme, and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
+
+### Colors for important weeks
+
+There are six: Blue (the default, and the color of weeks added before colors existed), Violet, Pink, Red, Green and Teal. Each has its own shade per theme, picked to stay distinct from the others and from the lived, ahead and this-week squares. To change a shade, edit its `--c-<color>` token in both theme blocks at the top of `styles.css`; to add a color, add it to `js/colors.js` and give it a token in each theme and a `.c-<color>` class (a test checks that none are missing).

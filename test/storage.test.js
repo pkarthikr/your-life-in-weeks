@@ -28,7 +28,7 @@ test('load ignores corrupt or unexpected data', () => {
   const odd = JSON.stringify({ birthday: 42, events: [null, { date: '2020-01-01' }, { date: '2020-01-01', label: 'ok' }], theme: 'neon' });
   assert.deepEqual(load(memoryStore({ [STORAGE_KEY]: odd })), {
     birthday: '',
-    events: [{ id: 1, date: '2020-01-01', label: 'ok' }],
+    events: [{ id: 1, date: '2020-01-01', label: 'ok', color: 'blue' }],
     theme: 'dark',
   });
 });
@@ -43,13 +43,24 @@ test('load gives every important week its own id', () => {
   ];
   const loaded = load(memoryStore({ [STORAGE_KEY]: JSON.stringify({ events }) }));
   assert.deepEqual(loaded.events.map((e) => e.id), [3, 4, 5, 6, 7]);
-  assert.deepEqual(loaded.events.at(-1), { id: 7, date: '2005-01-01', label: 'e' });
+  assert.deepEqual(loaded.events.at(-1), { id: 7, date: '2005-01-01', label: 'e', color: 'blue' });
+});
+
+test('load keeps each important week\'s color and defaults the rest to blue', () => {
+  const events = [
+    { id: 1, date: '2001-01-01', label: 'a', color: 'violet' },
+    { id: 2, date: '2002-01-01', label: 'b' }, // saved before colors existed
+    { id: 3, date: '2003-01-01', label: 'c', color: 'chartreuse' },
+    { id: 4, date: '2004-01-01', label: 'd', color: 7 },
+  ];
+  const loaded = load(memoryStore({ [STORAGE_KEY]: JSON.stringify({ events }) }));
+  assert.deepEqual(loaded.events.map((e) => e.color), ['violet', 'blue', 'blue', 'blue']);
 });
 
 test('save merges into what is stored and round-trips', () => {
-  const store = memoryStore({ [STORAGE_KEY]: JSON.stringify({ theme: 'light', events: [{ id: 1, date: '2010-05-01', label: 'Graduated' }] }) });
+  const store = memoryStore({ [STORAGE_KEY]: JSON.stringify({ theme: 'light', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }] }) });
   const next = save({ birthday: '1990-01-01' }, store);
-  assert.deepEqual(next, { birthday: '1990-01-01', events: [{ id: 1, date: '2010-05-01', label: 'Graduated' }], theme: 'light' });
+  assert.deepEqual(next, { birthday: '1990-01-01', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }], theme: 'light' });
   assert.deepEqual(load(store), next);
 });
 

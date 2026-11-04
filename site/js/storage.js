@@ -2,6 +2,8 @@
 // single key. There is no server and no account: clearing site data, or
 // opening the app in another browser, starts fresh.
 
+import { colorOrDefault } from './colors.js';
+
 export const STORAGE_KEY = 'liw:v1';
 
 const DEFAULTS = Object.freeze({ birthday: '', events: [], theme: 'dark' });
@@ -19,7 +21,8 @@ const isId = (id) => Number.isSafeInteger(id) && id > 0;
 
 /**
  * Keep the well-formed important weeks and make sure each has its own
- * positive integer id, so any one of them can be removed.
+ * positive integer id, so any one of them can be removed. A missing or
+ * unknown color (weeks saved before colors existed) becomes the default.
  */
 function cleanEvents(list) {
   if (!Array.isArray(list)) return [];
@@ -29,7 +32,7 @@ function cleanEvents(list) {
   return valid.map((e) => {
     const id = isId(e.id) && !seen.has(e.id) ? e.id : next++;
     seen.add(id);
-    return { id, date: e.date, label: e.label };
+    return { id, date: e.date, label: e.label, color: colorOrDefault(e.color) };
   });
 }
 
@@ -37,7 +40,8 @@ function cleanEvents(list) {
  * Read saved data. Always returns a complete, well-formed object, even when
  * storage is unavailable, empty or holds something unexpected.
  *
- * Shape: { birthday: 'YYYY-MM-DD' | '', events: [{ id, date, label }], theme: 'dark' | 'light' }
+ * Shape: { birthday: 'YYYY-MM-DD' | '', events: [{ id, date, label, color }], theme: 'dark' | 'light' }
+ * `color` is one of the ids in colors.js.
  */
 export function load(store = defaultStore()) {
   let saved = {};
