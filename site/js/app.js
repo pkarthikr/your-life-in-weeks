@@ -10,6 +10,7 @@
 import {
   YEARS,
   WEEKS_PER_YEAR,
+  BIRTH_WEEK,
   parseISODate,
   toISODate,
   formatDate,
@@ -163,8 +164,10 @@ function buildGrid(birth, nowIndex) {
       const state = cellState(i, nowIndex, events);
       const cell = document.createElement('span');
       cell.className = CELL_CLASS[state];
-      if (state === 'event') {
-        cell.classList.add(`c-${weekColor(events.get(i))}`);
+      if (state === 'event') cell.classList.add(`c-${weekColor(events.get(i))}`);
+      // The week you were born is ringed, whatever else it is.
+      if (i === BIRTH_WEEK) cell.classList.add('b');
+      if (state === 'event' || i === BIRTH_WEEK) {
         cell.dataset.ev = String(i);
       } else {
         cell.title =
@@ -226,12 +229,14 @@ function eventItem(event, birth) {
 
 function showPopover(cell) {
   const index = Number(cell.dataset.ev);
-  const list = events.get(index);
-  if (!list || hoverIndex === index) return;
+  const list = events.get(index) ?? [];
+  const born = index === BIRTH_WEEK;
+  if ((!list.length && !born) || hoverIndex === index) return;
   hoverIndex = index;
 
-  $('pop-when').textContent = formatWhen(currentBirth, parseISODate(list[0].date));
-  $('pop-title').textContent = list.map((e) => e.label).join('\n');
+  // The week you were born comes first, then its important dates, if any.
+  $('pop-when').textContent = formatWhen(currentBirth, born ? currentBirth : parseISODate(list[0].date));
+  $('pop-title').textContent = [...(born ? ['You were born'] : []), ...list.map((e) => e.label)].join('\n');
 
   const rows = $('rows');
   const wrap = rows.getBoundingClientRect();

@@ -5,7 +5,7 @@
 // storyLayout, storyText and siteAddress are pure, so they are unit tested.
 // drawStory only uses the 2D canvas context it is given.
 
-import { YEARS, WEEKS_PER_YEAR, cellState } from './weeks.js';
+import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, cellState } from './weeks.js';
 import { COLORS, weekColor } from './colors.js';
 
 /**
@@ -166,6 +166,19 @@ function addRect(ctx, x, y, w, h, radius) {
   else ctx.rect(x, y, w, h);
 }
 
+/**
+ * A ring of `color` around a box `x, y, w, h` (corner `radius`), `gap` away
+ * from it and `width` wide. The gap is painted `bg`; draw the box after.
+ */
+function ringBox(ctx, { x, y, w, h }, radius, { color, bg, gap, width }) {
+  for (const [fill, out] of [[color, gap + width], [bg, gap]]) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    addRect(ctx, x - out, y - out, w + 2 * out, h + 2 * out, radius + out);
+    ctx.fill();
+  }
+}
+
 /** Fill the weeks at `indexes` in one go, each grown by `grow` on every side. */
 function fillCells(ctx, grid, indexes, color, grow = 0) {
   if (!indexes.length) return;
@@ -231,7 +244,8 @@ function drawMark(ctx, x, y, colors) {
  * - `site`: the address to print at the bottom, or ''
  *
  * Important weeks show in their colors but their labels are left off: the
- * picture is meant to be posted, the labels are private.
+ * picture is meant to be posted, the labels are private. The week you were
+ * born is ringed in the this-week color, as on the page.
  */
 export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, site = '' }) {
   const layout = storyLayout(format, { years: stats.years, footer: Boolean(site) });
@@ -283,46 +297,70 @@ export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, 
   const marks = [...byColor].filter(([, indexes]) => indexes.length).map(([id, indexes]) => ({ shade: colors.marks[id], indexes }));
 
   // This week and important weeks are drawn a little bigger, with a ring,
-  // as on the page.
+  // as on the page. The week you were born is left for last, since its ring
+  // goes over its neighbours.
   const grow = Math.max(1, Math.round(grid.cellH * 0.1));
   const ring = (share) => grow + Math.max(2, Math.round(grid.cellH * share));
-  fillCells(ctx, grid, groups.lived, colors.ink);
-  fillCells(ctx, grid, groups.ahead, colors.future);
-  fillCells(ctx, grid, groups.now, colors.nowA, ring(0.35));
-  fillCells(ctx, grid, groups.now, colors.now, grow);
+  const notBirth = (indexes) => indexes.filter((i) => i !== BIRTH_WEEK);
+  fillCells(ctx, grid, notBirth(groups.lived), colors.ink);
+  fillCells(ctx, grid, notBirth(groups.ahead), colors.future);
+  fillCells(ctx, grid, notBirth(groups.now), colors.nowA, ring(0.35));
+  fillCells(ctx, grid, notBirth(groups.now), colors.now, grow);
   ctx.globalAlpha = colors.halo;
-  for (const { shade, indexes } of marks) fillCells(ctx, grid, indexes, shade, ring(0.18));
+  for (const { shade, indexes } of marks) fillCells(ctx, grid, notBirth(indexes), shade, ring(0.18));
   ctx.globalAlpha = 1;
-  for (const { shade, indexes } of marks) fillCells(ctx, grid, indexes, shade, grow);
+  for (const { shade, indexes } of marks) fillCells(ctx, grid, notBirth(indexes), shade, grow);
+
+  // The week you were born: its own color inside a ring of the this-week
+  // color, with a gap of background between.
+  const birthState = cellState(BIRTH_WEEK, stats.nowIndex, events);
+  const [birthColor, birthGrow] = {
+    lived: [colors.ink, 0],
+    now: [colors.now, grow],
+    event: [colors.marks[weekColor(events.get(BIRTH_WEEK) ?? [])], grow],
+  }[birthState];
+  const radius = Math.max(1, Math.round(grid.cellH / 5));
+  const birthBox = cellBox(grid, BIRTH_WEEK);
+  const birthRing = { color: colors.now, bg: colors.bg, gap: Math.max(1, Math.round(grid.cellH * 0.1)), width: Math.max(2, Math.round(grid.cellH * 0.2)) };
+  ringBox(ctx, { x: birthBox.x - birthGrow, y: birthBox.y - birthGrow, w: birthBox.w + 2 * birthGrow, h: birthBox.h + 2 * birthGrow }, radius + birthGrow, birthRing);
+  fillCells(ctx, grid, [BIRTH_WEEK], birthColor, birthGrow);
 
   // Legend, shrunk to the grid's width if it has to be. Important weeks get
-  // one swatch per color on the grid, side by side, as on the page.
+  // one swatch per color on the grid, side by side, as on the page. Born's
+  // swatch is ringed like the week.
   const items = [
     ['Lived', [colors.ink]],
     ['Ahead', [colors.future]],
   ];
   if (groups.now.length) items.push(['This week', [colors.now]]);
+  items.push(['Born', [colors.ink], true]);
   if (marks.length) items.push(['Important week', marks.map((m) => m.shade)]);
   const legendFont = (s) => `400 ${s}px ${SANS}`;
   const swatchSize = (s) => Math.round(s * 0.75);
   const swatchGap = 4;
-  const swatchesWidth = (s, n) => n * swatchSize(s) + (n - 1) * swatchGap;
+  const swatchRing = { color: colors.now, bg: colors.bg, gap: 2, width: 3 };
+  const ringRoom = swatchRing.gap + swatchRing.width;
+  const swatchesWidth = (s, n, ringed) => n * swatchSize(s) + (n - 1) * swatchGap + (ringed ? 2 * ringRoom : 0);
   const legendWidth = (s) =>
     items.reduce(
-      (sum, [label, shades]) => sum + swatchesWidth(s, shades.length) + s * 0.45 + ctx.measureText(label).width,
+      (sum, [label, shades, ringed]) => sum + swatchesWidth(s, shades.length, ringed) + s * 0.45 + ctx.measureText(label).width,
       (items.length - 1) * s * 1.1,
     );
   const legendSize = fitFont(ctx, legendFont, layout.legend.size, layout.textWidth, legendWidth);
   const swatch = swatchSize(legendSize);
   let x = layout.left;
-  for (const [label, shades] of items) {
+  for (const [label, shades, ringed] of items) {
+    if (ringed) x += ringRoom;
     for (const shade of shades) {
+      const box = { x, y: Math.round(layout.legend.y - swatch / 2), w: swatch, h: swatch };
+      if (ringed) ringBox(ctx, box, 3, swatchRing);
       ctx.fillStyle = shade;
       ctx.beginPath();
-      addRect(ctx, x, Math.round(layout.legend.y - swatch / 2), swatch, swatch, 3);
+      addRect(ctx, box.x, box.y, box.w, box.h, 3);
       ctx.fill();
       x += swatch + swatchGap;
     }
+    if (ringed) x += ringRoom;
     x += legendSize * 0.45 - swatchGap;
     ctx.fillStyle = colors.muted;
     ctx.fillText(label, x, layout.legend.y);

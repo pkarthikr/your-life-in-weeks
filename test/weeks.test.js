@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import {
   YEARS,
+  WEEKS_PER_YEAR,
+  BIRTH_WEEK,
   parseISODate,
   toISODate,
   formatDate,
@@ -42,6 +44,12 @@ test('weekPosition: rows start on the birthday', () => {
   assert.deepEqual(weekPosition(b, d('1991-06-14')), { row: 0, col: 51 });
   assert.deepEqual(weekPosition(b, d('1991-06-15')), { row: 1, col: 0 });
   assert.equal(weekPosition(b, d('1990-06-14')), null);
+});
+
+test('the week you were born is the first square', () => {
+  const b = d('1990-06-15');
+  const { row, col } = weekPosition(b, b);
+  assert.equal(row * WEEKS_PER_YEAR + col, BIRTH_WEEK);
 });
 
 test('weekPosition: last week of a year absorbs leftover days', () => {

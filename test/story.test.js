@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { YEARS, WEEKS_PER_YEAR, parseISODate, lifeStats, eventsByWeek } from '../site/js/weeks.js';
+import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, parseISODate, lifeStats, eventsByWeek } from '../site/js/weeks.js';
 import { FORMATS, storyLayout, cellBox, storyText, siteAddress, drawStory } from '../site/js/story.js';
 import { COLORS as PALETTE } from '../site/js/colors.js';
 
@@ -121,27 +121,34 @@ const COLORS = {
 };
 
 function draw(birthday, today, events = [], site = 'example.github.io/weeks') {
-  const birth = d(birthday);
+  const born = d(birthday);
   const ctx = fakeContext();
-  drawStory(ctx, { stats: lifeStats(birth, d(today)), events: eventsByWeek(birth, events), colors: COLORS, site });
+  drawStory(ctx, { stats: lifeStats(born, d(today)), events: eventsByWeek(born, events), colors: COLORS, site });
   // Only what is filled on the grid; the legend and brand mark reuse its colours.
   const { grid } = storyLayout(story, { footer: Boolean(site) });
   const onGrid = ([x, y]) => x >= grid.x - 10 && x < grid.x + grid.width && y >= grid.y - 10 && y < grid.y + grid.height;
+  // The week you were born, its ring and the gap inside the ring are all
+  // centred on the first week; they are counted apart from the other weeks.
+  const first = cellBox(grid, BIRTH_WEEK);
+  const onBirth = ([x, y, w, h]) => x + w / 2 === first.x + first.w / 2 && y + h / 2 === first.y + first.h / 2;
   const filled = (color, alpha = 1) =>
     ctx.calls
       .filter((c) => c.op === 'fill' && c.color === color && c.alpha === alpha)
-      .flatMap((c) => c.rects.filter(onGrid));
+      .flatMap((c) => c.rects.filter((r) => onGrid(r) && !onBirth(r)));
+  // What is painted on the week you were born, in order, biggest first.
+  const birthFills = ctx.calls.filter((c) => c.op === 'fill').flatMap((c) => c.rects.filter((r) => onGrid(r) && onBirth(r)).map((r) => ({ color: c.color, w: r[2] })));
+  const birth = birthFills.map((f) => f.color);
   // Swatches drawn on the legend's line, in order.
   const layout = storyLayout(story, { footer: Boolean(site) });
   const legend = ctx.calls
     .filter((c) => c.op === 'fill' && c.rects.some(([, y, , h]) => Math.abs(y + h / 2 - layout.legend.y) < 2))
     .map((c) => c.color);
   const texts = ctx.calls.filter((c) => c.op === 'text').map((c) => c.text);
-  return { ctx, filled, texts, legend };
+  return { ctx, filled, birth, birthFills, first, texts, legend };
 }
 
 test('drawStory paints the background and every week once', () => {
-  const { ctx, filled } = draw('1990-01-01', '2026-11-04', [
+  const { ctx, filled, birth } = draw('1990-01-01', '2026-11-04', [
     { id: 1, date: '2015-03-02', label: 'Moved', color: 'blue' },
     { id: 2, date: '2020-08-10', label: 'Married', color: 'blue' },
   ]);
@@ -152,8 +159,10 @@ test('drawStory paints the background and every week once', () => {
   const events = filled('BLUE').length;
   assert.equal(now, 1);
   assert.equal(events, 2);
-  assert.equal(lived + ahead + now + events, YEARS * WEEKS_PER_YEAR);
-  assert.equal(lived, 1915 - 2);
+  // Plus the week you were born, painted last with its ring.
+  assert.equal(lived + ahead + now + events + 1, YEARS * WEEKS_PER_YEAR);
+  assert.equal(lived, 1915 - 2 - 1);
+  assert.deepEqual(birth, ['NOW', 'BG', 'INK']);
   // Rings behind this week and the important weeks.
   assert.equal(filled('NOWA').length, 1);
   assert.equal(filled('BLUE', 0.3).length, 2);
@@ -172,8 +181,9 @@ test('drawStory paints each important week in its own color, and the legend show
   assert.equal(filled('PINK').length, 2);
   assert.equal(filled('BLUE').length, 1, 'no color means the default');
   assert.equal(filled('PINK', 0.3).length, 2, 'each has a halo in its color');
-  // Lived, ahead, this week, then one swatch per color in palette order.
-  assert.deepEqual(legend, ['INK', 'FUTURE', 'NOW', 'BLUE', 'PINK', 'GREEN']);
+  // Lived, ahead, this week, born (a ringed swatch: ring, gap, swatch), then
+  // one swatch per color in palette order.
+  assert.deepEqual(legend, ['INK', 'FUTURE', 'NOW', 'NOW', 'BG', 'INK', 'BLUE', 'PINK', 'GREEN']);
 });
 
 test('drawStory writes the title, ages, legend and address, and no event labels', () => {
@@ -181,7 +191,7 @@ test('drawStory writes the title, ages, legend and address, and no event labels'
   assert.ok(texts.includes('1,915 weeks lived.'));
   assert.ok(texts.includes('3,284 weeks ahead.'));
   assert.deepEqual(texts.filter((t) => /^\d+$/.test(t)), ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90']);
-  for (const label of ['Lived', 'Ahead', 'This week', 'Important week']) assert.ok(texts.includes(label), label);
+  for (const label of ['Lived', 'Ahead', 'This week', 'Born', 'Important week']) assert.ok(texts.includes(label), label);
   assert.ok(texts.includes('example.github.io/weeks'));
   assert.ok(!texts.some((t) => t.includes('Secret')), 'important-week labels stay private');
 });
@@ -194,7 +204,9 @@ test('drawStory leaves out legend entries and the address when there is nothing 
   // Past the end of the grid there is no "this week".
   const past = draw('1920-01-01', '2026-11-04');
   assert.ok(!past.texts.includes('This week'));
-  assert.equal(past.filled('INK').length, YEARS * WEEKS_PER_YEAR);
+  assert.equal(past.filled('INK').length + 1, YEARS * WEEKS_PER_YEAR);
+  assert.deepEqual(past.birth, ['NOW', 'BG', 'INK']);
+  assert.ok(past.texts.includes('Born'), 'the week you were born is still ringed');
   assert.ok(past.texts.includes('0 weeks ahead.'));
 });
 
@@ -204,5 +216,22 @@ test('drawStory keeps the title inside the grid width for the longest numbers', 
   for (const call of ctx.calls.filter((c) => c.op === 'text' && /weeks (lived|ahead)/.test(c.text))) {
     ctx.font = call.font;
     assert.ok(ctx.measureText(call.text).width <= textWidth, `${call.text} fits`);
+  }
+});
+
+test('drawStory rings the week you were born and keeps its own color inside', () => {
+  // A lived week, an important week and, for someone born this week, this week.
+  const cases = [
+    ['1990-01-01', '2026-11-04', [], 'INK'],
+    ['1990-01-01', '2026-11-04', [{ id: 1, date: '1990-01-03', label: 'Home from hospital', color: 'green' }], 'GREEN'],
+    ['2026-11-04', '2026-11-04', [], 'NOW'],
+  ];
+  for (const [birthday, today, events, inside] of cases) {
+    const { birth, birthFills, first, filled } = draw(birthday, today, events);
+    assert.deepEqual(birth, ['NOW', 'BG', inside], `born ${birthday}`);
+    const [ring, gap, week] = birthFills.map((f) => f.w);
+    assert.ok(ring > gap && gap > week && week >= first.w, 'ring, then a gap, then the week');
+    // Its halo, if it has one, is left off: the ring takes its place.
+    assert.equal(filled(inside, 0.3).length, 0);
   }
 });

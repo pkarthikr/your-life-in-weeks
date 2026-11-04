@@ -457,6 +457,11 @@ a { color: inherit; }
 .lg-ahead { background: var(--future); }
 .lg-now { background: var(--now); }
 .lg-mark { background: var(--mark); }
+.lg-born {
+  background: var(--ink);
+  box-shadow: var(--born-ring);
+  margin: 0 3px;
+}
 
 /* The colors of the important weeks on the grid, side by side. */
 .lg-set {
@@ -525,6 +530,20 @@ a { color: inherit; }
   cursor: pointer;
   position: relative;
   z-index: 1;
+}
+
+/* The week you were born: a ring in the this-week color, with a gap of
+   background so the week keeps its own color inside (lived, or an important
+   week's color). A ring rather than another color, so it can't be mistaken
+   for an important week. */
+:root { --born-ring: 0 0 0 1.5px var(--bg), 0 0 0 3px var(--now); }
+
+.w.b {
+  box-shadow: var(--born-ring);
+  animation: none;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
 }
 
 @keyframes pulse {
@@ -659,6 +678,7 @@ a { color: inherit; }
   .rows { gap: 3px; }
   .cells { column-gap: 1px; }
   .w { border-radius: 1px; }
+  :root { --born-ring: 0 0 0 1px var(--bg), 0 0 0 2px var(--now); }
 }
 
 /* ---- No birthday yet --------------------------------------------------- */

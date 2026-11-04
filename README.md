@@ -62,10 +62,12 @@ test/            unit tests (node --test)
 
 Both screens are on one page; the address picks which one shows, so the browser's back button and reload work as expected.
 
-- **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks show in the color you picked for them; hover one for details. If two important dates fall in the same week, the square takes the earlier one's color. Before a birthday is saved, it asks you to add one.
-  - **Post as a story** makes a 1080 × 1920 PNG of your whole grid, sized for Instagram stories, in your current theme. Save it, or, where the browser supports sharing files (most phones), share it straight to Instagram or Photos. Important weeks show in their colors but their labels are left off, since the picture is meant to be posted. The site's address is printed at the bottom so friends can make their own.
+- **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks show in the color you picked for them; hover one for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. If it is also an important week, it keeps that week's color inside the ring. Before a birthday is saved, it asks you to add one.
+  - **Post as a story** makes a 1080 × 1920 PNG of your whole grid, sized for Instagram stories, in your current theme. Save it, or, where the browser supports sharing files (most phones), share it straight to Instagram or Photos. Important weeks show in their colors but their labels are left off, since the picture is meant to be posted. The week you were born is ringed, as on the page. The site's address is printed at the bottom so friends can make their own.
 - **Settings** (`#settings`): your birthday, the light or dark theme, and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
 
 ### Colors for important weeks
 
 There are six: Blue (the default, and the color of weeks added before colors existed), Violet, Pink, Red, Green and Teal. Each has its own shade per theme, picked to stay distinct from the others and from the lived, ahead and this-week squares. To change a shade, edit its `--c-<color>` token in both theme blocks at the top of `styles.css`; to add a color, add it to `js/colors.js` and give it a token in each theme and a `.c-<color>` class (a test checks that none are missing).
+
+The week you were born is marked with a ring rather than a seventh color. With six important-week colors plus the lived, ahead and this-week squares, no further hue stayed clearly apart from all of them in both themes, including for color-blind readers.

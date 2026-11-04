@@ -7,6 +7,9 @@
 export const YEARS = 100;
 export const WEEKS_PER_YEAR = 52;
 
+/** The week you were born: always the first square (age 0, week 1). */
+export const BIRTH_WEEK = 0;
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_MS = 86400000;
 
