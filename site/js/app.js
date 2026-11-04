@@ -23,7 +23,8 @@ import {
 } from './weeks.js';
 import { STORAGE_KEY, load, save } from './storage.js';
 import { birthdayError, eventError, lastCalendarDay, addEvent, removeEvent } from './settings.js';
-import { COLORS, DEFAULT_COLOR } from './colors.js';
+import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
+import { FORMATS, STORY_FONTS, drawStory, storyText, siteAddress } from './story.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -125,11 +126,6 @@ function renderLegendColors() {
       return swatch;
     }),
   );
-}
-
-/** A week with several important dates takes the color of the earliest. */
-function weekColor(list) {
-  return list[0].color;
 }
 
 function buildAxis() {
@@ -358,9 +354,147 @@ $('event-list').addEventListener('click', (e) => {
   (left[Math.min(at, left.length - 1)] ?? $('event-date')).focus();
 });
 
+// ---- Post as a story -------------------------------------------------------
+//
+// Draws the grid as a picture sized for Instagram stories, shows it, and
+// offers to save it (and, where the browser can, to share it straight to an
+// app). All of it happens in the browser; nothing is uploaded.
+
+const THEME_COLORS = ['bg', 'text', 'ink', 'muted', 'future', 'now', 'nowA'];
+
+let story = null; // { url, file } for the picture on show
+let storyRun = 0; // bumped on every open and close, so a late picture is dropped
+
+/** The current theme's colours, read from the same tokens the page uses. */
+function themeColors() {
+  const css = getComputedStyle(document.documentElement);
+  const token = (name) => css.getPropertyValue(`--${name}`).trim();
+  return {
+    ...Object.fromEntries(THEME_COLORS.map((name) => [name, token(name)])),
+    marks: Object.fromEntries(COLORS.map((c) => [c.id, token(`c-${c.id}`)])),
+    halo: (parseFloat(token('halo')) || 30) / 100,
+  };
+}
+
+async function makeStory(format) {
+  const today = startOfToday();
+  const birth = parseISODate(data.birthday);
+  const stats = lifeStats(birth, today, YEARS);
+
+  // Draw with the page's fonts. If they can't load, system fonts stand in.
+  await Promise.all(STORY_FONTS.map((font) => document.fonts?.load(font))).catch(() => {});
+
+  const canvas = document.createElement('canvas');
+  canvas.width = format.width;
+  canvas.height = format.height;
+  drawStory(canvas.getContext('2d'), {
+    format,
+    stats,
+    events: eventsByWeek(birth, data.events, YEARS),
+    colors: themeColors(),
+    site: siteAddress(location.href),
+  });
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('The browser could not make the picture.');
+  const text = storyText(stats);
+  return {
+    blob,
+    name: `life-in-weeks-${toISODate(today)}.png`,
+    alt: `My life in weeks: ${text.lived} ${text.ahead}`,
+  };
+}
+
+function setStoryStatus(message) {
+  $('story-status').textContent = message;
+  $('story-status').hidden = !message;
+}
+
+function setStoryError(message) {
+  $('story-error').textContent = message;
+  $('story-error').hidden = !message;
+}
+
+function clearStory() {
+  if (story) URL.revokeObjectURL(story.url);
+  story = null;
+  setStoryError('');
+  $('story-img').hidden = true;
+  $('story-img').removeAttribute('src');
+  $('story-save').removeAttribute('href');
+  $('story-actions').hidden = true;
+}
+
+function showStory({ blob, name, alt }) {
+  const url = URL.createObjectURL(blob);
+  const file = new File([blob], name, { type: blob.type });
+  story = { url, file };
+
+  const img = $('story-img');
+  img.src = url;
+  img.alt = alt;
+  img.hidden = false;
+  setStoryStatus('');
+
+  const save = $('story-save');
+  save.href = url;
+  save.download = name;
+
+  // Phones (and some desktops) can hand the file to Instagram or save it
+  // to Photos through the share sheet; offer that first where it works.
+  let canShare = false;
+  try {
+    canShare = !!navigator.canShare?.({ files: [file] });
+  } catch {
+    canShare = false;
+  }
+  $('story-share').hidden = !canShare;
+  save.className = canShare ? 'btn btn-2' : 'btn';
+  $('story-actions').hidden = false;
+}
+
+async function openStory() {
+  const run = ++storyRun;
+  clearStory();
+  setStoryStatus('Making your picture…');
+  $('story-dialog').showModal();
+  try {
+    const made = await makeStory(FORMATS.story);
+    if (run === storyRun) showStory(made);
+  } catch {
+    if (run === storyRun) setStoryStatus('Couldn’t make the picture. Close this and try again.');
+  }
+}
+
+$('story-open').addEventListener('click', openStory);
+$('story-close').addEventListener('click', () => $('story-dialog').close());
+
+// A click on the dimmed backdrop lands on the dialog itself, not its content.
+$('story-dialog').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.close();
+});
+
+$('story-dialog').addEventListener('close', () => {
+  storyRun++;
+  clearStory();
+  if (!$('weeks-view').hidden) $('story-open').focus();
+});
+
+$('story-share').addEventListener('click', async () => {
+  if (!story) return;
+  setStoryError('');
+  try {
+    await navigator.share({ files: [story.file] });
+  } catch (err) {
+    // Closing the share sheet is not an error.
+    if (err?.name !== 'AbortError') setStoryError('Couldn’t open sharing here. Use Save image instead.');
+  }
+});
+
 // ---- Switching screens -----------------------------------------------------
 
 window.addEventListener('hashchange', () => {
+  if ($('story-dialog').open) $('story-dialog').close();
   hidePopover();
   showBirthdayError('');
   showEventError(null);

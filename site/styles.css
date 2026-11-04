@@ -578,6 +578,79 @@ a { color: inherit; }
   transform: rotate(45deg);
 }
 
+/* ---- Post as a story --------------------------------------------------- */
+
+.hero-btn {
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.dlg {
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .35);
+}
+
+.dlg::backdrop { background: rgba(0, 0, 0, .6); }
+
+.dlg-in {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 24px 24px;
+}
+
+/* The close button's icon lines up with the content's right edge. */
+.dlg-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-right: -14px;
+}
+
+/* The preview keeps the picture's 9:16 shape at any screen size. */
+.shot {
+  align-self: center;
+  height: min(60vh, 520px);
+  height: min(60dvh, 520px);
+  aspect-ratio: 9 / 16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  outline: 1px solid var(--line);
+  outline-offset: -1px;
+}
+
+.shot .lab {
+  padding: 0 16px;
+  text-align: center;
+}
+
+.dlg-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.dlg-actions .btn { flex: 1 1 0; }
+
 /* Phones: keep the three stats on one line and the tiny cells square. */
 @media (max-width: 520px) {
   .stats { gap: 20px; }
@@ -865,6 +938,7 @@ a { color: inherit; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   height: 44px;
   padding: 0 18px;
   border: 0;
@@ -881,6 +955,18 @@ a { color: inherit; }
 }
 
 .btn:hover { opacity: .88; }
+
+/* Secondary: outlined, like the selected tab. */
+.btn-2 {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.btn-2:hover {
+  opacity: 1;
+  background: var(--line);
+}
 
 .btn:focus-visible,
 .segb:focus-visible,

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { COLORS, DEFAULT_COLOR, isColor, colorOrDefault } from '../site/js/colors.js';
+import { COLORS, DEFAULT_COLOR, isColor, colorOrDefault, weekColor } from '../site/js/colors.js';
 
 test('every color has a unique id and a name', () => {
   const ids = COLORS.map((c) => c.id);
@@ -25,6 +25,12 @@ test('isColor and colorOrDefault', () => {
   assert.equal(colorOrDefault('teal'), 'teal');
   assert.equal(colorOrDefault('neon'), DEFAULT_COLOR);
   assert.equal(colorOrDefault(null), DEFAULT_COLOR);
+});
+
+test('weekColor is the earliest important date\'s color', () => {
+  assert.equal(weekColor([{ color: 'green' }, { color: 'red' }]), 'green');
+  assert.equal(weekColor([{ color: 'neon' }]), DEFAULT_COLOR);
+  assert.equal(weekColor([{}]), DEFAULT_COLOR);
 });
 
 // The shades live in the stylesheet; make sure none is missing.

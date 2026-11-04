@@ -27,3 +27,11 @@ export function isColor(id) {
 export function colorOrDefault(id) {
   return isColor(id) ? id : DEFAULT_COLOR;
 }
+
+/**
+ * The color of a week on the grid, given its important dates in date order
+ * (a value from eventsByWeek): a week with several takes the earliest one's.
+ */
+export function weekColor(list) {
+  return colorOrDefault(list[0]?.color);
+}

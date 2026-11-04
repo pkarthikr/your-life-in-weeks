@@ -11,6 +11,7 @@ Life in Weeks is a static web page. There is no server, no database and no accou
 - Everything runs in your browser.
 - Your birthday, your important weeks and your theme are saved in your browser's `localStorage` under the key `liw:v1`. They never leave your device.
 - A different browser or device starts fresh. Clearing this site's data in your browser deletes everything.
+- **Post as a story** draws its picture in your browser too. Nothing is uploaded; you save or share the picture yourself.
 
 The only network requests are for the page's own files. That includes the Geist fonts, which are served with the site rather than from Google Fonts.
 
@@ -28,7 +29,7 @@ That runs `python3 -m http.server 8000 --directory site`. Then open http://local
 
 ## Tests
 
-The date math, the Settings rules and the storage layer have unit tests that use Node's built-in test runner (Node 20 or later):
+The date math, the Settings rules, the story picture's layout and drawing, and the storage layer have unit tests that use Node's built-in test runner (Node 20 or later):
 
 ```bash
 npm test
@@ -52,6 +53,7 @@ site/            the whole app, served as-is
   js/weeks.js    pure date math for the grid (no DOM)
   js/colors.js   the colors an important week can have (their shades are in styles.css)
   js/settings.js pure rules for Settings: checking dates, adding and removing important weeks
+  js/story.js    the story picture: its layout and canvas drawing (no DOM)
   js/storage.js  localStorage read/write
 test/            unit tests (node --test)
 ```
@@ -61,6 +63,7 @@ test/            unit tests (node --test)
 Both screens are on one page; the address picks which one shows, so the browser's back button and reload work as expected.
 
 - **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks show in the color you picked for them; hover one for details. If two important dates fall in the same week, the square takes the earlier one's color. Before a birthday is saved, it asks you to add one.
+  - **Post as a story** makes a 1080 × 1920 PNG of your whole grid, sized for Instagram stories, in your current theme. Save it, or, where the browser supports sharing files (most phones), share it straight to Instagram or Photos. Important weeks show in their colors but their labels are left off, since the picture is meant to be posted. The site's address is printed at the bottom so friends can make their own.
 - **Settings** (`#settings`): your birthday, the light or dark theme, and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
 
 ### Colors for important weeks

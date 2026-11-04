@@ -49,6 +49,7 @@
         <p class="eyebrow"><span id="years">100</span> years · <span id="total">5,200</span> weeks</p>
         <h1 class="title" id="weeks-title" tabindex="-1">Every square is a week.</h1>
         <p class="sub">Born <span id="born"></span>. You are in week <span id="week"></span> of year <span id="age"></span>.</p>
+        <button type="button" class="btn btn-2 hero-btn" id="story-open" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 10V2M5 5l3-3 3 3"/><path d="M5.5 7H4.5a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-1"/></svg>Post as a story</button>
       </div>
       <div class="stats">
         <div class="stat"><span class="statn" id="lived"></span><span class="statl">weeks lived</span></div>
@@ -135,6 +136,27 @@
       <a class="btn" href="#weeks">See my weeks</a>
     </div>
   </div>
+
+  <!-- Post as a story: the grid as a picture sized for Instagram stories.
+       It is drawn in the browser; nothing is uploaded. -->
+  <dialog id="story-dialog" class="dlg" aria-labelledby="story-title">
+    <div class="dlg-in">
+      <div class="dlg-head">
+        <h2 id="story-title" class="h2">Post as a story</h2>
+        <button type="button" class="x" id="story-close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+      </div>
+      <div class="shot">
+        <img id="story-img" alt="" hidden>
+        <p class="lab" id="story-status" role="status"></p>
+      </div>
+      <p class="note">Sized for Instagram stories, 1080 × 1920. Made on this device; nothing is uploaded.</p>
+      <div class="dlg-actions" id="story-actions" hidden>
+        <button type="button" class="btn" id="story-share" hidden>Share…</button>
+        <a class="btn" id="story-save" download>Save image</a>
+      </div>
+      <p class="err" id="story-error" role="alert" hidden></p>
+    </div>
+  </dialog>
 
   <template id="event-item">
     <li class="li">
