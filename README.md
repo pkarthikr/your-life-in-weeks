@@ -12,7 +12,7 @@ Life in Weeks is a static web page. There is no server, no database and no accou
 - Your birthday, your important weeks and your theme are saved in your browser's `localStorage` under the key `liw:v1`. They never leave your device.
 - A different browser or device starts fresh. Clearing this site's data in your browser deletes everything.
 
-The only network requests are for the page's own files and the Geist fonts from Google Fonts.
+The only network requests are for the page's own files. That includes the Geist fonts, which are served with the site rather than from Google Fonts.
 
 ## Run it locally
 
@@ -47,6 +47,7 @@ site/            the whole app, served as-is
   index.html     page markup
   styles.css     styles and the light and dark theme tokens
   favicon.svg
+  fonts/         Geist and Geist Mono (woff2), with their license in OFL.txt
   js/app.js      rendering and events for the Weeks and Settings screens
   js/weeks.js    pure date math for the grid (no DOM)
   js/colors.js   the colors an important week can have (their shades are in styles.css)
