@@ -89,9 +89,44 @@ a { color: inherit; }
   font-size: 16px;
 }
 
+.nav-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .tabs {
   display: flex;
   gap: 4px;
+}
+
+.nav-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+}
+
+/* Link to the source code on GitHub. */
+.source {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.source:hover { color: var(--text); }
+
+.source:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 .tab {
@@ -132,6 +167,20 @@ a { color: inherit; }
   display: flex;
   flex-direction: column;
   gap: 40px;
+}
+
+/* Phones: keep the nav on one line. The GitHub link shows just its icon
+   (its aria-label still names it), and gutters narrow to 16px for the nav
+   and the page below it alike, so their edges stay lined up. This sits
+   after the .nav and .main rules so it overrides them. */
+@media (max-width: 520px) {
+  .nav { padding: 20px 16px; gap: 8px; }
+  .main { padding-left: 16px; padding-right: 16px; }
+  .nav-end { gap: 4px; }
+  .nav-sep { display: none; }
+  .tab { padding: 0 10px; }
+  .source { width: 40px; padding: 0; }
+  .source-text { display: none; }
 }
 
 /* ---- Header ------------------------------------------------------------ */
