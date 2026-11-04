@@ -632,6 +632,20 @@ a { color: inherit; }
   outline-offset: 1px;
 }
 
+/* iOS Safari draws date inputs as a native control that ignores
+   box-sizing, so the padding pushes it past its field, and it centres the
+   date. Drop the native look and start the date where text inputs start. */
+.in[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  min-width: 0;
+}
+
+.in::-webkit-date-and-time-value {
+  margin: 0;
+  text-align: left;
+}
+
 /* A button, or a link that looks like one. */
 .btn {
   box-sizing: border-box;
