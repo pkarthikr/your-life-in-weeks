@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Life in Weeks</title>
-<meta name="description" content="Your whole life on one page, one square per week. Runs entirely in your browser — your birthday is saved only on this device.">
+<meta name="description" content="Your whole life on one page, one square per week. Runs entirely in your browser — your birthday and important weeks are saved only on this device.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,20 +28,21 @@
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="1" width="4" height="4" rx="1" fill="currentColor"/><rect x="7" y="1" width="4" height="4" rx="1" fill="currentColor"/><rect x="13" y="1" width="4" height="4" rx="1" fill="currentColor"/><rect x="1" y="7" width="4" height="4" rx="1" fill="currentColor"/><rect x="7" y="7" width="4" height="4" rx="1" fill="#FFB547"/><rect x="13" y="7" width="4" height="4" rx="1" fill="currentColor" opacity=".25"/><rect x="1" y="13" width="4" height="4" rx="1" fill="currentColor" opacity=".25"/><rect x="7" y="13" width="4" height="4" rx="1" fill="currentColor" opacity=".25"/><rect x="13" y="13" width="4" height="4" rx="1" fill="currentColor" opacity=".25"/></svg>
     Life in Weeks
   </span>
+  <div class="tabs">
+    <a class="tab" href="#weeks" data-tab="weeks">Weeks</a>
+    <a class="tab" href="#settings" data-tab="settings">Settings</a>
+  </div>
 </nav>
 
 <main class="main">
 
-  <!-- Your weeks: shown once a birthday is saved. -->
-  <div id="weeks" class="weeks" hidden>
+  <!-- Weeks: shown once a birthday is saved. -->
+  <div id="weeks-view" class="weeks" hidden>
     <header class="hero">
       <div class="hero-text">
         <p class="eyebrow"><span id="years">100</span> years · <span id="total">5,200</span> weeks</p>
-        <h1 class="title">Every square is a week.</h1>
-        <p class="sub">
-          Born <span id="born"></span>. You are in week <span id="week"></span> of year <span id="age"></span>.
-          <button type="button" class="link" id="change-birthday">Change birthday</button>
-        </p>
+        <h1 class="title" id="weeks-title" tabindex="-1">Every square is a week.</h1>
+        <p class="sub">Born <span id="born"></span>. You are in week <span id="week"></span> of year <span id="age"></span>.</p>
       </div>
       <div class="stats">
         <div class="stat"><span class="statn" id="lived"></span><span class="statl">weeks lived</span></div>
@@ -68,21 +69,72 @@
     </section>
   </div>
 
-  <!-- First visit (or changing the birthday): ask for a date of birth. -->
-  <div id="setup" class="setup" hidden>
-    <h1 class="title title-sm">Every square is a week.</h1>
-    <p class="setup-sub" id="setup-sub">Add your birthday to see yours.</p>
-    <form id="birthday-form" class="setup-form" novalidate>
-      <div class="field">
-        <label class="lab" for="birthday">Date of birth</label>
-        <input id="birthday" class="in" type="date" min="1900-01-01" required aria-describedby="birthday-note">
-      </div>
-      <button type="submit" class="btn">See my weeks</button>
-      <button type="button" class="btn btn-quiet" id="cancel-change" hidden>Cancel</button>
-    </form>
-    <p class="err" id="birthday-error" role="alert" hidden></p>
-    <p class="note" id="birthday-note">Saved only in this browser. Nothing is sent anywhere.</p>
+  <!-- Weeks, before a birthday is saved. -->
+  <div id="setup-view" class="setup" hidden>
+    <h1 class="title title-sm" id="setup-title" tabindex="-1">Every square is a week.</h1>
+    <p class="setup-sub">Add your birthday to see yours.</p>
+    <a class="btn" href="#settings">Add birthday</a>
+    <p class="note">Saved only in this browser. Nothing is sent anywhere.</p>
   </div>
+
+  <!-- Settings. Every change is saved straight away, in this browser only. -->
+  <div id="settings-view" class="settings" hidden>
+    <h1 class="title title-md" id="settings-title" tabindex="-1">Settings</h1>
+
+    <section class="card" aria-labelledby="s-birthday">
+      <h2 id="s-birthday" class="h2">Your birthday</h2>
+      <div class="field">
+        <label class="lab" for="set-birthday">Date of birth</label>
+        <input id="set-birthday" class="in" type="date" min="1900-01-01" aria-describedby="birthday-error">
+      </div>
+      <p class="err" id="birthday-error" role="alert" hidden></p>
+    </section>
+
+    <section class="card" aria-labelledby="s-appearance">
+      <h2 id="s-appearance" class="h2">Appearance</h2>
+      <div class="seg" role="group" aria-label="Theme">
+        <button type="button" class="segb" data-set-theme="light" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1"/></svg>Light</button>
+        <button type="button" class="segb" data-set-theme="dark" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z"/></svg>Dark</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="s-events">
+      <div class="card-head">
+        <h2 id="s-events" class="h2">Important weeks</h2>
+        <p class="lab">They show up as highlighted squares on your calendar.</p>
+      </div>
+      <form id="event-form" class="add-form" novalidate>
+        <div class="field field-date">
+          <label class="lab" for="event-date">Date</label>
+          <input id="event-date" class="in" type="date" aria-describedby="event-error">
+        </div>
+        <div class="field field-what">
+          <label class="lab" for="event-label">What happened</label>
+          <input id="event-label" class="in" type="text" placeholder="e.g. Moved to Seattle" maxlength="100" autocomplete="off" aria-describedby="event-error">
+        </div>
+        <button type="submit" class="btn">Add</button>
+      </form>
+      <p class="err" id="event-error" role="alert" hidden></p>
+      <ul class="list" id="event-list" hidden></ul>
+      <p class="lab" id="no-events">No important weeks yet.</p>
+    </section>
+
+    <div class="settings-foot">
+      <p class="note">Everything here is saved only in this browser. Nothing is sent anywhere.</p>
+      <a class="btn" href="#weeks">See my weeks</a>
+    </div>
+  </div>
+
+  <template id="event-item">
+    <li class="li">
+      <span class="lg lg-mark" aria-hidden="true"></span>
+      <div class="li-text">
+        <span class="li-label"></span>
+        <span class="li-meta"></span>
+      </div>
+      <button type="button" class="x"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    </li>
+  </template>
 
   <noscript>
     <p class="setup-sub">Life in Weeks runs in your browser and needs JavaScript turned on.</p>

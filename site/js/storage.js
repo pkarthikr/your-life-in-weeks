@@ -15,6 +15,24 @@ function defaultStore() {
   }
 }
 
+const isId = (id) => Number.isSafeInteger(id) && id > 0;
+
+/**
+ * Keep the well-formed important weeks and make sure each has its own
+ * positive integer id, so any one of them can be removed.
+ */
+function cleanEvents(list) {
+  if (!Array.isArray(list)) return [];
+  const valid = list.filter((e) => e && typeof e.date === 'string' && typeof e.label === 'string');
+  let next = valid.reduce((max, e) => (isId(e.id) ? Math.max(max, e.id) : max), 0) + 1;
+  const seen = new Set();
+  return valid.map((e) => {
+    const id = isId(e.id) && !seen.has(e.id) ? e.id : next++;
+    seen.add(id);
+    return { id, date: e.date, label: e.label };
+  });
+}
+
 /**
  * Read saved data. Always returns a complete, well-formed object, even when
  * storage is unavailable, empty or holds something unexpected.
@@ -31,9 +49,7 @@ export function load(store = defaultStore()) {
   if (typeof saved !== 'object' || Array.isArray(saved)) saved = {};
   return {
     birthday: typeof saved.birthday === 'string' ? saved.birthday : DEFAULTS.birthday,
-    events: Array.isArray(saved.events)
-      ? saved.events.filter((e) => e && typeof e.date === 'string' && typeof e.label === 'string')
-      : [],
+    events: cleanEvents(saved.events),
     theme: saved.theme === 'light' ? 'light' : DEFAULTS.theme,
   };
 }
