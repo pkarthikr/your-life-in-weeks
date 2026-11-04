@@ -23,6 +23,7 @@ import {
 } from './weeks.js';
 import { STORAGE_KEY, load, save } from './storage.js';
 import { birthdayError, eventError, lastCalendarDay, addEvent, removeEvent } from './settings.js';
+import { COLORS, DEFAULT_COLOR } from './colors.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -102,6 +103,7 @@ function renderWeeks(birth, today) {
   events = eventsByWeek(birth, data.events, YEARS);
   currentBirth = birth;
   $('legend-events').hidden = events.size === 0;
+  renderLegendColors();
 
   // Rebuilding 5,200 cells is cheap but not free; only do it when the
   // inputs that shape the grid change.
@@ -111,6 +113,23 @@ function renderWeeks(birth, today) {
     hidePopover();
     buildGrid(birth, stats.nowIndex);
   }
+}
+
+/** One legend swatch per color on the grid, in palette order. */
+function renderLegendColors() {
+  const used = new Set([...events.values()].map(weekColor));
+  $('legend-colors').replaceChildren(
+    ...COLORS.filter((c) => used.has(c.id)).map((c) => {
+      const swatch = document.createElement('span');
+      swatch.className = `lg lg-mark c-${c.id}`;
+      return swatch;
+    }),
+  );
+}
+
+/** A week with several important dates takes the color of the earliest. */
+function weekColor(list) {
+  return list[0].color;
 }
 
 function buildAxis() {
@@ -149,6 +168,7 @@ function buildGrid(birth, nowIndex) {
       const cell = document.createElement('span');
       cell.className = CELL_CLASS[state];
       if (state === 'event') {
+        cell.classList.add(`c-${weekColor(events.get(i))}`);
         cell.dataset.ev = String(i);
       } else {
         cell.title =
@@ -197,6 +217,7 @@ function renderSettings(birth, today) {
 function eventItem(event, birth) {
   const item = $('event-item').content.firstElementChild.cloneNode(true);
   const date = parseISODate(event.date);
+  item.querySelector('.lg').classList.add(`c-${event.color}`);
   item.querySelector('.li-label').textContent = event.label;
   item.querySelector('.li-meta').textContent = date ? formatWhen(birth, date) : event.date;
   const remove = item.querySelector('.x');
@@ -277,6 +298,27 @@ for (const button of document.querySelectorAll('[data-set-theme]')) {
 
 // ---- Settings: important weeks --------------------------------------------
 
+/** The color picker: one radio per color, the default checked. */
+function buildColorPicker() {
+  const template = $('color-option').content.firstElementChild;
+  $('event-colors').replaceChildren(
+    ...COLORS.map((color) => {
+      const option = template.cloneNode(true);
+      option.classList.add(`c-${color.id}`);
+      option.title = color.name;
+      const input = option.querySelector('input');
+      input.value = color.id;
+      input.checked = color.id === DEFAULT_COLOR;
+      option.querySelector('.vh').textContent = color.name;
+      return option;
+    }),
+  );
+}
+
+function chosenColor() {
+  return $('event-form').querySelector('input[name="event-color"]:checked')?.value ?? DEFAULT_COLOR;
+}
+
 function showEventError(problem) {
   const err = $('event-error');
   err.textContent = problem?.message ?? '';
@@ -295,7 +337,8 @@ $('event-form').addEventListener('submit', (e) => {
     $(EVENT_FIELDS[problem.field]).focus();
     return;
   }
-  update({ events: addEvent(data.events, date.value, label.value) });
+  // The color stays as picked, so several weeks of one kind are quick to add.
+  update({ events: addEvent(data.events, date.value, label.value, chosenColor()) });
   date.value = '';
   label.value = '';
   date.focus();
@@ -345,4 +388,5 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') render();
 });
 
+buildColorPicker();
 render();

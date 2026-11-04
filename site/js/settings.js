@@ -3,6 +3,7 @@
 // Pure functions — no DOM, no storage — so they are safe to unit test.
 
 import { YEARS, parseISODate, addYears, addDays } from './weeks.js';
+import { colorOrDefault } from './colors.js';
 
 export const EARLIEST_YEAR = 1900;
 
@@ -38,10 +39,13 @@ export function eventError(birthday, value, label, years = YEARS) {
   return null;
 }
 
-/** A copy of `events` with one more added under the next free id. */
-export function addEvent(events, date, label) {
+/**
+ * A copy of `events` with one more added under the next free id.
+ * A missing or unknown `color` falls back to the default.
+ */
+export function addEvent(events, date, label, color) {
   const id = events.reduce((max, e) => (Number.isSafeInteger(e.id) ? Math.max(max, e.id) : max), 0) + 1;
-  return [...events, { id, date, label: String(label).trim() }];
+  return [...events, { id, date, label: String(label).trim(), color: colorOrDefault(color) }];
 }
 
 /** A copy of `events` without the one with this id. */

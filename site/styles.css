@@ -13,8 +13,14 @@
   --future: #26272C;
   --now: #FFB547;
   --nowA: rgba(255, 181, 71, .5);
-  --mark: #6E9BF5;
-  --markA: rgba(110, 155, 245, .3);
+  --mark: var(--c-blue);
+  --halo: 30%;
+  --c-blue: #6E9BF5;
+  --c-violet: #A05DDB;
+  --c-pink: #F697CE;
+  --c-red: #EB6264;
+  --c-green: #46B250;
+  --c-teal: #47D6CF;
   --popbg: #ECECE8;
   --poptx: #0F1012;
   --popmu: #55565C;
@@ -32,8 +38,14 @@
   --future: #D3D3CC;
   --now: #E4572E;
   --nowA: rgba(228, 87, 46, .45);
-  --mark: #2F6FEB;
-  --markA: rgba(47, 111, 235, .25);
+  --mark: var(--c-blue);
+  --halo: 25%;
+  --c-blue: #2F6FEB;
+  --c-violet: #913FD5;
+  --c-pink: #EB64A7;
+  --c-red: #B51446;
+  --c-green: #078C38;
+  --c-teal: #19A9AE;
   --popbg: #18181A;
   --poptx: #F5F5F2;
   --popmu: #B9B9B4;
@@ -41,9 +53,34 @@
   color-scheme: light;
 }
 
+/* Colors for important weeks (ids from js/colors.js). Each class points
+   --mark at its shade for the current theme; anything that paints with
+   --mark (a week, a legend swatch, a picker swatch) follows it. The shades
+   were checked to stay apart from each other and from the lived, ahead and
+   this-week squares in both themes. */
+.c-blue { --mark: var(--c-blue); }
+.c-violet { --mark: var(--c-violet); }
+.c-pink { --mark: var(--c-pink); }
+.c-red { --mark: var(--c-red); }
+.c-green { --mark: var(--c-green); }
+.c-teal { --mark: var(--c-teal); }
+
 /* ---- Base -------------------------------------------------------------- */
 
 [hidden] { display: none !important; }
+
+/* Read by screen readers, not shown. */
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 html { background: var(--bg); }
 
@@ -315,6 +352,12 @@ a { color: inherit; }
 .lg-now { background: var(--now); }
 .lg-mark { background: var(--mark); }
 
+/* The colors of the important weeks on the grid, side by side. */
+.lg-set {
+  display: flex;
+  gap: 3px;
+}
+
 .rows {
   display: flex;
   flex-direction: column;
@@ -371,7 +414,7 @@ a { color: inherit; }
 
 .w.s {
   background: var(--mark);
-  box-shadow: 0 0 0 3px var(--markA);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mark) var(--halo), transparent);
   transform: scale(1.2);
   cursor: pointer;
   position: relative;
@@ -532,6 +575,70 @@ a { color: inherit; }
 
 .field-date { flex: 1 1 160px; }
 .field-what { flex: 2 1 220px; }
+
+/* Color picker: a row of swatch radios on a line of its own, with Add
+   beside it where there is room (below it on phones). */
+.field-color {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field-color .lab {
+  padding: 0;
+  margin-bottom: 6px;
+}
+
+/* Pulled left so the first swatch lines up with the label above it. */
+.swatches {
+  display: flex;
+  margin-left: -10px;
+}
+
+/* 44px to tap (a little less on the narrowest phones, so the six stay on
+   one line); the swatch inside is smaller. */
+.sw {
+  position: relative;
+  flex: 0 1 44px;
+  min-width: 36px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sw input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.sw-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--mark);
+}
+
+.sw:hover .sw-dot { transform: scale(1.08); }
+
+.sw input:checked + .sw-dot {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text);
+}
+
+.sw input:focus-visible + .sw-dot {
+  outline: 2px solid var(--text);
+  outline-offset: 6px;
+}
+
+@media (forced-colors: active) {
+  .sw input:checked + .sw-dot { outline: 3px solid CanvasText; outline-offset: 2px; }
+}
 
 .list {
   list-style: none;

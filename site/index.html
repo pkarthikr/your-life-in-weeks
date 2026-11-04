@@ -63,7 +63,7 @@
         <span class="leg"><span class="lg lg-lived"></span>Lived</span>
         <span class="leg"><span class="lg lg-ahead"></span>Ahead</span>
         <span class="leg"><span class="lg lg-now"></span>This week</span>
-        <span class="leg" id="legend-events" hidden><span class="lg lg-mark"></span>Important week · hover for details</span>
+        <span class="leg" id="legend-events" hidden><span class="lg-set" id="legend-colors"></span>Important week · hover for details</span>
       </div>
       <div class="row"><span class="yl"></span><div class="cells" id="axis"></div></div>
       <div class="rows" id="rows" role="img">
@@ -108,7 +108,7 @@
     <section class="card" aria-labelledby="s-events">
       <div class="card-head">
         <h2 id="s-events" class="h2">Important weeks</h2>
-        <p class="lab">They show up as highlighted squares on your calendar.</p>
+        <p class="lab">They show up on your calendar as squares in the color you pick.</p>
       </div>
       <form id="event-form" class="add-form" novalidate>
         <div class="field field-date">
@@ -119,6 +119,11 @@
           <label class="lab" for="event-label">What happened</label>
           <input id="event-label" class="in" type="text" placeholder="e.g. Moved to Seattle" maxlength="100" autocomplete="off" aria-describedby="event-error">
         </div>
+        <fieldset class="field-color">
+          <legend class="lab">Color</legend>
+          <!-- One radio per color in js/colors.js, added by app.js. -->
+          <div class="swatches" id="event-colors"></div>
+        </fieldset>
         <button type="submit" class="btn">Add</button>
       </form>
       <p class="err" id="event-error" role="alert" hidden></p>
@@ -141,6 +146,14 @@
       </div>
       <button type="button" class="x"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </li>
+  </template>
+
+  <template id="color-option">
+    <label class="sw">
+      <input type="radio" name="event-color">
+      <span class="sw-dot" aria-hidden="true"></span>
+      <span class="vh"></span>
+    </label>
   </template>
 
   <noscript>

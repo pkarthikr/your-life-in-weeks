@@ -58,12 +58,17 @@ test('eventError names the field to fix', () => {
   assert.deepEqual(eventError('1990-06-15', '2080-06-15', 'x', 90), { field: 'date', message: 'That date is past the end of your calendar.' });
 });
 
-test('addEvent appends with the next free id and trims the label', () => {
-  assert.deepEqual(addEvent([], '2015-03-02', ' Moved '), [{ id: 1, date: '2015-03-02', label: 'Moved' }]);
+test('addEvent appends with the next free id, trims the label and keeps the color', () => {
+  assert.deepEqual(addEvent([], '2015-03-02', ' Moved ', 'teal'), [{ id: 1, date: '2015-03-02', label: 'Moved', color: 'teal' }]);
   const events = [{ id: 4, date: '2010-01-01', label: 'A' }, { id: 2, date: '2012-01-01', label: 'B' }];
-  const next = addEvent(events, '2014-01-01', 'C');
-  assert.deepEqual(next.at(-1), { id: 5, date: '2014-01-01', label: 'C' });
+  const next = addEvent(events, '2014-01-01', 'C', 'pink');
+  assert.deepEqual(next.at(-1), { id: 5, date: '2014-01-01', label: 'C', color: 'pink' });
   assert.equal(events.length, 2, 'does not change the list it was given');
+});
+
+test('addEvent falls back to the default color', () => {
+  assert.equal(addEvent([], '2015-03-02', 'x').at(-1).color, 'blue');
+  assert.equal(addEvent([], '2015-03-02', 'x', 'neon').at(-1).color, 'blue');
 });
 
 test('removeEvent drops only the matching id', () => {
