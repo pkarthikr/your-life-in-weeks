@@ -37,25 +37,33 @@ test('storyLayout draws whole-pixel weeks with a gap between every pair', () => 
   const { grid } = storyLayout(story);
   assert.equal(grid.cols, WEEKS_PER_YEAR);
   assert.equal(grid.rows, YEARS);
-  for (const n of [grid.x, grid.y, grid.cell, grid.colGap, grid.rowGap]) assert.ok(Number.isInteger(n));
-  assert.ok(grid.cell >= 8, `weeks are big enough to see (${grid.cell}px)`);
+  for (const n of [grid.x, grid.y, grid.cellW, grid.cellH, grid.colGap, grid.rowGap]) assert.ok(Number.isInteger(n));
+  assert.ok(grid.cellH >= 8, `weeks are tall enough to see (${grid.cellH}px)`);
   assert.ok(grid.colGap >= 1 && grid.rowGap >= grid.colGap);
-  assert.equal(grid.width, grid.cols * grid.cell + (grid.cols - 1) * grid.colGap);
-  assert.equal(grid.height, grid.rows * grid.cell + (grid.rows - 1) * grid.rowGap);
+  assert.equal(grid.width, grid.cols * grid.cellW + (grid.cols - 1) * grid.colGap);
+  assert.equal(grid.height, grid.rows * grid.cellH + (grid.rows - 1) * grid.rowGap);
+});
+
+test('storyLayout fills the width with weeks wider than they are tall', () => {
+  const { grid } = storyLayout(story);
+  const room = story.width - 2 * story.sideMargin;
+  assert.ok(grid.cellW > grid.cellH, `${grid.cellW} × ${grid.cellH}`);
+  // Only the rounding down of each week's width is left over.
+  assert.ok(grid.width <= room && room - grid.width < grid.cols, `${grid.width} of ${room}px`);
 });
 
 test('cellBox walks the grid row by row', () => {
   const { grid } = storyLayout(story);
-  assert.deepEqual(cellBox(grid, 0), { x: grid.x, y: grid.y, size: grid.cell });
+  assert.deepEqual(cellBox(grid, 0), { x: grid.x, y: grid.y, w: grid.cellW, h: grid.cellH });
   const second = cellBox(grid, 1);
-  assert.equal(second.x, grid.x + grid.cell + grid.colGap);
+  assert.equal(second.x, grid.x + grid.cellW + grid.colGap);
   assert.equal(second.y, grid.y);
   const nextRow = cellBox(grid, WEEKS_PER_YEAR);
   assert.equal(nextRow.x, grid.x);
-  assert.equal(nextRow.y, grid.y + grid.cell + grid.rowGap);
+  assert.equal(nextRow.y, grid.y + grid.cellH + grid.rowGap);
   const last = cellBox(grid, YEARS * WEEKS_PER_YEAR - 1);
-  assert.equal(last.x + last.size, grid.x + grid.width);
-  assert.equal(last.y + last.size, grid.y + grid.height);
+  assert.equal(last.x + last.w, grid.x + grid.width);
+  assert.equal(last.y + last.h, grid.y + grid.height);
 });
 
 test('storyText counts weeks lived and ahead', () => {
@@ -126,7 +134,7 @@ function draw(birthday, today, events = [], site = 'example.github.io/weeks') {
   // Swatches drawn on the legend's line, in order.
   const layout = storyLayout(story, { footer: Boolean(site) });
   const legend = ctx.calls
-    .filter((c) => c.op === 'fill' && c.rects.some(([, y, w]) => Math.abs(y + w / 2 - layout.legend.y) < 2))
+    .filter((c) => c.op === 'fill' && c.rects.some(([, y, , h]) => Math.abs(y + h / 2 - layout.legend.y) < 2))
     .map((c) => c.color);
   const texts = ctx.calls.filter((c) => c.op === 'text').map((c) => c.text);
   return { ctx, filled, texts, legend };
