@@ -25,7 +25,7 @@ import {
 import { STORAGE_KEY, load, save } from './storage.js';
 import { birthdayError, eventError, lastCalendarDay, addEvent, removeEvent } from './settings.js';
 import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
-import { FORMATS, STORY_FONTS, drawStory, storyText, siteAddress } from './story.js';
+import { FORMATS, PICTURE_FONTS, drawPicture, pictureText, siteAddress } from './picture.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -211,6 +211,10 @@ function renderSettings(birth, today) {
   $('event-list').replaceChildren(...sorted.map((event) => eventItem(event, birth)));
   $('event-list').hidden = sorted.length === 0;
   $('no-events').hidden = sorted.length > 0;
+
+  // A picture needs a birthday to draw from.
+  for (const button of $('share-formats').querySelectorAll('[data-format]')) button.disabled = !birth;
+  $('share-needs-birthday').hidden = Boolean(birth);
 }
 
 function eventItem(event, birth) {
@@ -359,16 +363,36 @@ $('event-list').addEventListener('click', (e) => {
   (left[Math.min(at, left.length - 1)] ?? $('event-date')).focus();
 });
 
-// ---- Post as a story -------------------------------------------------------
+// ---- Share pictures ---------------------------------------------------------
 //
-// Draws the grid as a picture sized for Instagram stories, shows it, and
-// offers to save it (and, where the browser can, to share it straight to an
-// app). All of it happens in the browser; nothing is uploaded.
+// Settings has one button per picture format (js/picture.js). Each draws the
+// grid as a picture in that format, shows it, and offers to save it (and,
+// where the browser can, to share it straight to an app). All of it happens
+// in the browser; nothing is uploaded.
 
 const THEME_COLORS = ['bg', 'text', 'ink', 'muted', 'future', 'now', 'nowA'];
 
-let story = null; // { url, file } for the picture on show
-let storyRun = 0; // bumped on every open and close, so a late picture is dropped
+let picture = null; // { url, file } for the picture on show
+let pictureRun = 0; // bumped on every open and close, so a late picture is dropped
+let pictureOpener = null; // the format button that opened the dialog
+
+/** One button per format, each with a little outline of the picture's shape. */
+function buildFormatButtons() {
+  const template = $('format-option').content.firstElementChild;
+  $('share-formats').replaceChildren(
+    ...Object.values(FORMATS).map((format) => {
+      const button = template.cloneNode(true);
+      button.dataset.format = format.id;
+      button.querySelector('.fmt-name').textContent = format.name;
+      button.querySelector('.fmt-size').textContent = `${format.width} × ${format.height}`;
+      const scale = Math.min(36 / format.width, 28 / format.height);
+      const shape = button.querySelector('.fmt-shape');
+      shape.style.width = `${Math.round(format.width * scale)}px`;
+      shape.style.height = `${Math.round(format.height * scale)}px`;
+      return button;
+    }),
+  );
+}
 
 /** The current theme's colours, read from the same tokens the page uses. */
 function themeColors() {
@@ -381,18 +405,18 @@ function themeColors() {
   };
 }
 
-async function makeStory(format) {
+async function makePicture(format) {
   const today = startOfToday();
   const birth = parseISODate(data.birthday);
   const stats = lifeStats(birth, today, YEARS);
 
   // Draw with the page's fonts. If they can't load, system fonts stand in.
-  await Promise.all(STORY_FONTS.map((font) => document.fonts?.load(font))).catch(() => {});
+  await Promise.all(PICTURE_FONTS.map((font) => document.fonts?.load(font))).catch(() => {});
 
   const canvas = document.createElement('canvas');
   canvas.width = format.width;
   canvas.height = format.height;
-  drawStory(canvas.getContext('2d'), {
+  drawPicture(canvas.getContext('2d'), {
     format,
     stats,
     events: eventsByWeek(birth, data.events, YEARS),
@@ -402,104 +426,121 @@ async function makeStory(format) {
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!blob) throw new Error('The browser could not make the picture.');
-  const text = storyText(stats);
+  const text = pictureText(stats);
   return {
     blob,
-    name: `life-in-weeks-${toISODate(today)}.png`,
+    name: `life-in-weeks-${format.id}-${toISODate(today)}.png`,
     alt: `My life in weeks: ${text.lived} ${text.ahead}`,
   };
 }
 
-function setStoryStatus(message) {
-  $('story-status').textContent = message;
-  $('story-status').hidden = !message;
+function setPictureStatus(message) {
+  $('share-status').textContent = message;
+  $('share-status').hidden = !message;
 }
 
-function setStoryError(message) {
-  $('story-error').textContent = message;
-  $('story-error').hidden = !message;
+function setPictureError(message) {
+  $('share-error').textContent = message;
+  $('share-error').hidden = !message;
 }
 
-function clearStory() {
-  if (story) URL.revokeObjectURL(story.url);
-  story = null;
-  setStoryError('');
-  $('story-img').hidden = true;
-  $('story-img').removeAttribute('src');
-  $('story-save').removeAttribute('href');
-  $('story-actions').hidden = true;
+function clearPicture() {
+  if (picture) URL.revokeObjectURL(picture.url);
+  picture = null;
+  setPictureError('');
+  $('share-img').hidden = true;
+  $('share-img').removeAttribute('src');
+  $('share-save').removeAttribute('href');
+  $('share-actions').hidden = true;
 }
 
-function showStory({ blob, name, alt }) {
+function showPicture({ blob, name, alt }) {
   const url = URL.createObjectURL(blob);
   const file = new File([blob], name, { type: blob.type });
-  story = { url, file };
+  picture = { url, file };
 
-  const img = $('story-img');
+  const img = $('share-img');
   img.src = url;
   img.alt = alt;
   img.hidden = false;
-  setStoryStatus('');
+  setPictureStatus('');
 
-  const save = $('story-save');
+  const save = $('share-save');
   save.href = url;
   save.download = name;
 
-  // Phones (and some desktops) can hand the file to Instagram or save it
-  // to Photos through the share sheet; offer that first where it works.
+  // Phones (and some desktops) can hand the file to Instagram, LinkedIn or
+  // X, or save it to Photos, through the share sheet; offer that first
+  // where it works.
   let canShare = false;
   try {
     canShare = !!navigator.canShare?.({ files: [file] });
   } catch {
     canShare = false;
   }
-  $('story-share').hidden = !canShare;
+  $('share-send').hidden = !canShare;
   save.className = canShare ? 'btn btn-2' : 'btn';
-  $('story-actions').hidden = false;
+  $('share-actions').hidden = false;
 }
 
-async function openStory() {
-  const run = ++storyRun;
-  clearStory();
-  setStoryStatus('Making your picture…');
-  $('story-dialog').showModal();
+/** Open the dialog for `format` and make its picture. */
+async function openPicture(format, opener) {
+  const run = ++pictureRun;
+  pictureOpener = opener;
+  clearPicture();
+
+  $('share-title').textContent = format.name;
+  $('share-note').textContent =
+    `${format.width} × ${format.height}, sized for ${format.sizedFor}. Made on this device; nothing is uploaded.`;
+  // The preview keeps the picture's shape; wide pictures get a wider dialog.
+  $('share-shot').style.setProperty('--w', format.width);
+  $('share-shot').style.setProperty('--h', format.height);
+  $('share-dialog').dataset.shape = format.width > format.height ? 'wide' : 'tall';
+  setPictureStatus('Making your picture…');
+  $('share-dialog').showModal();
+
   try {
-    const made = await makeStory(FORMATS.story);
-    if (run === storyRun) showStory(made);
+    const made = await makePicture(format);
+    if (run === pictureRun) showPicture(made);
   } catch {
-    if (run === storyRun) setStoryStatus('Couldn’t make the picture. Close this and try again.');
+    if (run === pictureRun) setPictureStatus('Couldn’t make the picture. Close this and try again.');
   }
 }
 
-$('story-open').addEventListener('click', openStory);
-$('story-close').addEventListener('click', () => $('story-dialog').close());
+$('share-formats').addEventListener('click', (e) => {
+  const button = e.target.closest('[data-format]');
+  if (button && !button.disabled) openPicture(FORMATS[button.dataset.format], button);
+});
+
+$('share-close').addEventListener('click', () => $('share-dialog').close());
 
 // A click on the dimmed backdrop lands on the dialog itself, not its content.
-$('story-dialog').addEventListener('click', (e) => {
+$('share-dialog').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) e.currentTarget.close();
 });
 
-$('story-dialog').addEventListener('close', () => {
-  storyRun++;
-  clearStory();
-  if (!$('weeks-view').hidden) $('story-open').focus();
+$('share-dialog').addEventListener('close', () => {
+  pictureRun++;
+  clearPicture();
+  if (pictureOpener?.isConnected && !$('settings-view').hidden) pictureOpener.focus();
+  pictureOpener = null;
 });
 
-$('story-share').addEventListener('click', async () => {
-  if (!story) return;
-  setStoryError('');
+$('share-send').addEventListener('click', async () => {
+  if (!picture) return;
+  setPictureError('');
   try {
-    await navigator.share({ files: [story.file] });
+    await navigator.share({ files: [picture.file] });
   } catch (err) {
     // Closing the share sheet is not an error.
-    if (err?.name !== 'AbortError') setStoryError('Couldn’t open sharing here. Use Save image instead.');
+    if (err?.name !== 'AbortError') setPictureError('Couldn’t open sharing here. Use Save image instead.');
   }
 });
 
 // ---- Switching screens -----------------------------------------------------
 
 window.addEventListener('hashchange', () => {
-  if ($('story-dialog').open) $('story-dialog').close();
+  if ($('share-dialog').open) $('share-dialog').close();
   hidePopover();
   showBirthdayError('');
   showEventError(null);
@@ -528,4 +569,5 @@ document.addEventListener('visibilitychange', () => {
 });
 
 buildColorPicker();
+buildFormatButtons();
 render();
