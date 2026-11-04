@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" class="t-dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Life in Weeks</title>
+<meta name="description" content="Your whole life on one page, one square per week. Runs entirely in your browser — your birthday is saved only on this device.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="styles.css">
+<script>
+  // Apply the saved theme before first paint so there is no flash.
+  try {
+    if (JSON.parse(localStorage.getItem('liw:v1') || '{}').theme === 'light') {
+      document.documentElement.className = 't-light';
+    }
+  } catch (e) {}
+</script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<div class="app">
+
+<nav class="nav" aria-label="Main">
+  <span class="brand">
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="1" y="1" width="4" height="4" rx="1" fill="currentColor"/><rect x="7" y="1" width="4" height="4" rx="1" fill="currentColor"/><rect x="13" y="1" width="4" height="4" rx="1" fill="currentColor"/><rect x="1" y="7" width="4" height="4" rx="1" fill="currentColor"/><rect x="7" y="7" width="4" height="4" rx="1" fill="#FFB547"/><rect x="13" y="7" width="4" height="4" rx="1" fill="currentColor" opacity=".25"/><rect x="1" y="13" width="4" height="4" rx="1" fill="currentColor" opacity=".25"/><rect x="7" y="13" width="4" height="4" rx="1" fill="currentColor" opacity=".25"/><rect x="13" y="13" width="4" height="4" rx="1" fill="currentColor" opacity=".25"/></svg>
+    Life in Weeks
+  </span>
+</nav>
+
+<main class="main">
+
+  <!-- Your weeks: shown once a birthday is saved. -->
+  <div id="weeks" class="weeks" hidden>
+    <header class="hero">
+      <div class="hero-text">
+        <p class="eyebrow"><span id="years">90</span> years · <span id="total">4,680</span> weeks</p>
+        <h1 class="title">Every square is a week.</h1>
+        <p class="sub">
+          Born <span id="born"></span>. You are in week <span id="week"></span> of year <span id="age"></span>.
+          <button type="button" class="link" id="change-birthday">Change birthday</button>
+        </p>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="statn" id="lived"></span><span class="statl">weeks lived</span></div>
+        <div class="stat"><span class="statn" id="ahead"></span><span class="statl">weeks ahead</span></div>
+        <div class="stat"><span class="statn"><span id="pct"></span>%</span><span class="statl">of <span id="years-2">90</span> years</span></div>
+      </div>
+    </header>
+
+    <section class="grid" aria-label="Week grid">
+      <div class="legend">
+        <span class="leg"><span class="lg lg-lived"></span>Lived</span>
+        <span class="leg"><span class="lg lg-ahead"></span>Ahead</span>
+        <span class="leg"><span class="lg lg-now"></span>This week</span>
+        <span class="leg" id="legend-events" hidden><span class="lg lg-mark"></span>Important week · hover for details</span>
+      </div>
+      <div class="row"><span class="yl"></span><div class="cells" id="axis"></div></div>
+      <div class="rows" id="rows" role="img">
+        <div class="pop" id="pop" hidden>
+          <span class="pop-when" id="pop-when"></span>
+          <span class="pop-title" id="pop-title"></span>
+          <span class="pop-a" id="pop-a"></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- First visit (or changing the birthday): ask for a date of birth. -->
+  <div id="setup" class="setup" hidden>
+    <h1 class="title title-sm">Every square is a week.</h1>
+    <p class="setup-sub" id="setup-sub">Add your birthday to see yours.</p>
+    <form id="birthday-form" class="setup-form" novalidate>
+      <div class="field">
+        <label class="lab" for="birthday">Date of birth</label>
+        <input id="birthday" class="in" type="date" min="1900-01-01" required aria-describedby="birthday-note">
+      </div>
+      <button type="submit" class="btn">See my weeks</button>
+      <button type="button" class="btn btn-quiet" id="cancel-change" hidden>Cancel</button>
+    </form>
+    <p class="err" id="birthday-error" role="alert" hidden></p>
+    <p class="note" id="birthday-note">Saved only in this browser. Nothing is sent anywhere.</p>
+  </div>
+
+  <noscript>
+    <p class="setup-sub">Life in Weeks runs in your browser and needs JavaScript turned on.</p>
+  </noscript>
+
+</main>
+</div>
+</body>
+</html>

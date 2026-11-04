@@ -1,0 +1,14 @@
+{
+  "name": "your-life-in-weeks",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Your life on one page, one square per week. A static, local-first web app.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8000 --directory site",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
