@@ -6,6 +6,7 @@ import {
   parseISODate,
   toISODate,
   formatDate,
+  formatWhen,
   weekPosition,
   weekStart,
   lifeStats,
@@ -54,6 +55,14 @@ test('weekPosition: leap-day birthdays', () => {
   assert.deepEqual(weekPosition(b, d('2001-02-28')), { row: 0, col: 51 });
   assert.deepEqual(weekPosition(b, d('2001-03-01')), { row: 1, col: 0 });
   assert.deepEqual(weekPosition(b, d('2004-02-29')), { row: 4, col: 0 });
+});
+
+test('formatWhen gives the date, age and week (counted from 1)', () => {
+  const b = d('1990-06-15');
+  assert.equal(formatWhen(b, d('2015-03-02')), 'Mar 2, 2015 · age 24, week 38');
+  assert.equal(formatWhen(b, b), 'Jun 15, 1990 · age 0, week 1');
+  assert.equal(formatWhen(b, d('1991-06-14')), 'Jun 14, 1991 · age 0, week 52');
+  assert.equal(formatWhen(b, d('1990-06-14')), 'Jun 14, 1990');
 });
 
 test('weekStart is the inverse of weekPosition', () => {
