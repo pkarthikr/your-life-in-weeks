@@ -28,9 +28,22 @@ test('load ignores corrupt or unexpected data', () => {
   const odd = JSON.stringify({ birthday: 42, events: [null, { date: '2020-01-01' }, { date: '2020-01-01', label: 'ok' }], theme: 'neon' });
   assert.deepEqual(load(memoryStore({ [STORAGE_KEY]: odd })), {
     birthday: '',
-    events: [{ date: '2020-01-01', label: 'ok' }],
+    events: [{ id: 1, date: '2020-01-01', label: 'ok' }],
     theme: 'dark',
   });
+});
+
+test('load gives every important week its own id', () => {
+  const events = [
+    { id: 3, date: '2001-01-01', label: 'a' },
+    { id: 3, date: '2002-01-01', label: 'b' },
+    { date: '2003-01-01', label: 'c' },
+    { id: -1, date: '2004-01-01', label: 'd' },
+    { id: '2', date: '2005-01-01', label: 'e', extra: true },
+  ];
+  const loaded = load(memoryStore({ [STORAGE_KEY]: JSON.stringify({ events }) }));
+  assert.deepEqual(loaded.events.map((e) => e.id), [3, 4, 5, 6, 7]);
+  assert.deepEqual(loaded.events.at(-1), { id: 7, date: '2005-01-01', label: 'e' });
 });
 
 test('save merges into what is stored and round-trips', () => {

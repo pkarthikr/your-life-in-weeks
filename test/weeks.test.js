@@ -10,6 +10,7 @@ import {
   weekStart,
   lifeStats,
   eventsByWeek,
+  sortEvents,
   cellState,
 } from '../site/js/weeks.js';
 
@@ -112,6 +113,16 @@ test('eventsByWeek groups, sorts and drops out-of-range events', () => {
   const pos = weekPosition(b, d('2015-03-02'));
   assert.equal(index, pos.row * 52 + pos.col);
   assert.deepEqual(list.map((e) => e.label), ['First', 'Second']);
+});
+
+test('sortEvents orders by date, keeps same-day order, and copies', () => {
+  const events = [
+    { id: 1, date: '2015-03-04' },
+    { id: 2, date: '2010-01-01' },
+    { id: 3, date: '2015-03-04' },
+  ];
+  assert.deepEqual(sortEvents(events).map((e) => e.id), [2, 1, 3]);
+  assert.deepEqual(events.map((e) => e.id), [1, 2, 3]);
 });
 
 test('cellState', () => {

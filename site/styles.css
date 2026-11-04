@@ -1,4 +1,5 @@
-/* Life in Weeks — styles ported from the "Life in Weeks app" design. */
+/* Life in Weeks — styles ported from the "Life in Weeks app" design
+   (Weeks and Settings screens). */
 
 /* ---- Theme tokens ------------------------------------------------------ */
 
@@ -63,7 +64,8 @@ a { color: inherit; }
 .yl,
 .ax,
 .statn,
-.pop-when { font-family: 'Geist Mono', ui-monospace, monospace; }
+.pop-when,
+.li-meta { font-family: 'Geist Mono', ui-monospace, monospace; }
 
 /* ---- Nav --------------------------------------------------------------- */
 
@@ -85,6 +87,37 @@ a { color: inherit; }
   min-height: 40px;
   font-weight: 600;
   font-size: 16px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.tab {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tab:hover { color: var(--text); }
+
+.tab[aria-current="page"] {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
 }
 
 /* ---- Layout ------------------------------------------------------------ */
@@ -134,6 +167,15 @@ a { color: inherit; }
 }
 
 .title-sm { font-size: clamp(32px, 6vw, 40px); }
+
+.title-md {
+  margin-bottom: 8px;
+  font-size: 36px;
+  line-height: 1.1;
+}
+
+/* Headings take focus when the screen changes; that needs no ring. */
+.title:focus { outline: none; }
 
 .sub {
   margin: 0;
@@ -348,7 +390,7 @@ a { color: inherit; }
   .w { border-radius: 1px; }
 }
 
-/* ---- Birthday setup ---------------------------------------------------- */
+/* ---- No birthday yet --------------------------------------------------- */
 
 .setup {
   min-height: 60vh;
@@ -366,26 +408,159 @@ a { color: inherit; }
   color: var(--muted);
 }
 
-.setup-form {
-  width: 100%;
-  max-width: 420px;
+/* ---- Settings ---------------------------------------------------------- */
+
+.settings {
+  max-width: 592px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Segmented control: the theme picker. */
+.seg {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+.segb {
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.segb:hover { color: var(--text); }
+
+.segb[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.add-form {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   align-items: flex-end;
-  margin-top: 8px;
-  text-align: left;
 }
+
+.field-date { flex: 1 1 160px; }
+.field-what { flex: 2 1 220px; }
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.li-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.li-label {
+  font-size: 15px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.li-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Remove button on each important week. */
+.x {
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.x:hover {
+  color: var(--text);
+  background: var(--line);
+}
+
+.settings-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px 24px;
+  padding-top: 8px;
+}
+
+.settings-foot .btn { margin-left: auto; }
+
+/* ---- Form controls ----------------------------------------------------- */
 
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  flex: 1 1 200px;
   min-width: 0;
 }
 
 .lab {
+  margin: 0;
   font-size: 13px;
   color: var(--muted);
 }
@@ -408,7 +583,12 @@ a { color: inherit; }
   outline-offset: 1px;
 }
 
+/* A button, or a link that looks like one. */
 .btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 44px;
   padding: 0 18px;
   border: 0;
@@ -418,6 +598,7 @@ a { color: inherit; }
   font: inherit;
   font-size: 15px;
   font-weight: 500;
+  text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
   flex: 0 0 auto;
@@ -425,15 +606,11 @@ a { color: inherit; }
 
 .btn:hover { opacity: .88; }
 
-.btn:focus-visible {
+.btn:focus-visible,
+.segb:focus-visible,
+.x:focus-visible {
   outline: 2px solid var(--text);
   outline-offset: 2px;
-}
-
-.btn-quiet {
-  background: transparent;
-  color: var(--text);
-  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 .err {

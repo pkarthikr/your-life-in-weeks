@@ -84,14 +84,18 @@ export function lifeStats(birth, today, years = YEARS) {
   };
 }
 
+/** Important weeks in date order. Events on the same date keep their order. */
+export function sortEvents(events) {
+  return [...events].sort((a, z) => (a.date < z.date ? -1 : a.date > z.date ? 1 : 0));
+}
+
 /**
  * Group important weeks by grid index. Events before the birthday or past
  * the end of the grid are dropped. Within a week, events are date-ordered.
  */
 export function eventsByWeek(birth, events, years = YEARS) {
   const map = new Map();
-  const sorted = [...events].sort((a, z) => (a.date < z.date ? -1 : a.date > z.date ? 1 : 0));
-  for (const event of sorted) {
+  for (const event of sortEvents(events)) {
     const pos = weekPosition(birth, parseISODate(event.date));
     if (!pos || pos.row >= years) continue;
     const index = pos.row * WEEKS_PER_YEAR + pos.col;

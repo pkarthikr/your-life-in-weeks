@@ -9,7 +9,7 @@ Inspired by Tim Urban's [Your Life in Weeks](https://waitbutwhy.com/2014/05/life
 Life in Weeks is a static web page. There is no server, no database and no account.
 
 - Everything runs in your browser.
-- Your birthday (and, later, your important weeks and theme) is saved in your browser's `localStorage` under the key `liw:v1`. It never leaves your device.
+- Your birthday, your important weeks and your theme are saved in your browser's `localStorage` under the key `liw:v1`. They never leave your device.
 - A different browser or device starts fresh. Clearing this site's data in your browser deletes everything.
 
 The only network requests are for the page's own files and the Geist fonts from Google Fonts.
@@ -28,7 +28,7 @@ That runs `python3 -m http.server 8000 --directory site`. Then open http://local
 
 ## Tests
 
-The date math and storage layer have unit tests that use Node's built-in test runner (Node 20 or later):
+The date math, the Settings rules and the storage layer have unit tests that use Node's built-in test runner (Node 20 or later):
 
 ```bash
 npm test
@@ -47,12 +47,16 @@ site/            the whole app, served as-is
   index.html     page markup
   styles.css     styles and the light and dark theme tokens
   favicon.svg
-  js/app.js      rendering and events for the home page
+  js/app.js      rendering and events for the Weeks and Settings screens
   js/weeks.js    pure date math for the grid (no DOM)
+  js/settings.js pure rules for Settings: checking dates, adding and removing important weeks
   js/storage.js  localStorage read/write
 test/            unit tests (node --test)
 ```
 
-## Status
+## Screens
 
-This first version is the home page: the week grid and a birthday prompt. The Settings screen from the design is next. It covers picking the theme and adding important weeks. The home page already shows important weeks and the saved theme from storage.
+Both screens are on one page; the address picks which one shows, so the browser's back button and reload work as expected.
+
+- **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks are highlighted; hover one for details. Before a birthday is saved, it asks you to add one.
+- **Settings** (`#settings`): your birthday, the light or dark theme, and your important weeks (add a date and what happened, or remove one). Every change is saved straight away, in this browser only.

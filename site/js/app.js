@@ -1,7 +1,11 @@
-// Life in Weeks — home page.
+// Life in Weeks — the Weeks and Settings screens.
 //
 // Runs entirely in the browser. The birthday, important weeks and theme are
-// read from (and written to) localStorage only; see storage.js.
+// read from (and written to) localStorage only; see storage.js. Nothing is
+// sent anywhere.
+//
+// Both screens live on this one page. The address picks which one shows:
+// `#settings` for Settings, anything else for the weeks.
 
 import {
   YEARS,
@@ -14,9 +18,11 @@ import {
   weekStart,
   lifeStats,
   eventsByWeek,
+  sortEvents,
   cellState,
 } from './weeks.js';
 import { STORAGE_KEY, load, save } from './storage.js';
+import { birthdayError, eventError, lastCalendarDay, addEvent, removeEvent } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -25,28 +31,53 @@ const POP_HALF = 120; // half the popover's width, keeps it inside the grid
 
 const CELL_CLASS = { lived: 'w', ahead: 'w f', now: 'w n', event: 'w s' };
 
+const TITLES = { weeks: 'Life in Weeks', settings: 'Settings · Life in Weeks' };
+
+// The input to move to when an important week can't be added.
+const EVENT_FIELDS = { birthday: 'set-birthday', date: 'event-date', label: 'event-label' };
+
 let data = load();
-let editing = false;
 let gridKey = '';
 let events = new Map();
 let currentBirth = null;
 let hoverIndex = null;
+let shownBirthday = null; // the saved birthday last copied into the Settings field
+
+/**
+ * Save a change and redraw. The patch is merged into what this page already
+ * holds, so the visit keeps working even if the browser refuses to store it.
+ */
+function update(patch) {
+  data = save({ ...data, ...patch });
+  render();
+}
+
+function currentScreen() {
+  return location.hash === '#settings' ? 'settings' : 'weeks';
+}
 
 // ---- Rendering ------------------------------------------------------------
 
 function render() {
   document.documentElement.className = `t-${data.theme}`;
 
+  const screen = currentScreen();
   const today = startOfToday();
   const birth = parseISODate(data.birthday);
   const hasBirthday = !!birth && birth <= today;
-  const showWeeks = hasBirthday && !editing;
 
-  $('weeks').hidden = !showWeeks;
-  $('setup').hidden = showWeeks;
+  document.title = TITLES[screen];
+  for (const tab of document.querySelectorAll('[data-tab]')) {
+    if (tab.dataset.tab === screen) tab.setAttribute('aria-current', 'page');
+    else tab.removeAttribute('aria-current');
+  }
 
-  if (showWeeks) renderWeeks(birth, today);
-  else renderSetup(today, hasBirthday);
+  $('weeks-view').hidden = !(screen === 'weeks' && hasBirthday);
+  $('setup-view').hidden = !(screen === 'weeks' && !hasBirthday);
+  $('settings-view').hidden = screen !== 'settings';
+
+  if (screen === 'settings') renderSettings(hasBirthday ? birth : null, today);
+  else if (hasBirthday) renderWeeks(birth, today);
 }
 
 function renderWeeks(birth, today) {
@@ -133,12 +164,47 @@ function buildGrid(birth, nowIndex) {
   rows.insertBefore(frag, $('pop'));
 }
 
-function renderSetup(today, hasBirthday) {
-  const input = $('birthday');
+/** `birth` is the saved birthday as a Date, or null if there isn't one yet. */
+function renderSettings(birth, today) {
+  // Leave the field alone while someone is typing in it.
+  const input = $('set-birthday');
   input.max = toISODate(today);
-  if (!input.value && parseISODate(data.birthday)) input.value = data.birthday;
-  $('setup-sub').textContent = editing ? 'Pick a new date of birth.' : 'Add your birthday to see yours.';
-  $('cancel-change').hidden = !(editing && hasBirthday);
+  if (data.birthday !== shownBirthday && document.activeElement !== input) {
+    input.value = data.birthday;
+    shownBirthday = data.birthday;
+    showBirthdayError('');
+  }
+
+  for (const button of document.querySelectorAll('[data-set-theme]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.setTheme === data.theme));
+  }
+
+  const date = $('event-date');
+  if (birth) {
+    date.min = toISODate(birth);
+    date.max = toISODate(lastCalendarDay(birth, YEARS));
+  } else {
+    date.removeAttribute('min');
+    date.removeAttribute('max');
+  }
+
+  const sorted = sortEvents(data.events);
+  $('event-list').replaceChildren(...sorted.map((event) => eventItem(event, birth)));
+  $('event-list').hidden = sorted.length === 0;
+  $('no-events').hidden = sorted.length > 0;
+}
+
+function eventItem(event, birth) {
+  const item = $('event-item').content.firstElementChild.cloneNode(true);
+  const date = parseISODate(event.date);
+  const pos = weekPosition(birth, date);
+  item.querySelector('.li-label').textContent = event.label;
+  item.querySelector('.li-meta').textContent =
+    (date ? formatDate(date) : event.date) + (pos ? ` · age ${pos.row}, week ${pos.col + 1}` : '');
+  const remove = item.querySelector('.x');
+  remove.dataset.remove = String(event.id);
+  remove.setAttribute('aria-label', `Remove ${event.label}`);
+  return item;
 }
 
 // ---- Important-week popover ----------------------------------------------
@@ -179,45 +245,94 @@ $('rows').addEventListener('mouseover', (e) => {
 });
 $('rows').addEventListener('mouseleave', hidePopover);
 
-// ---- Birthday form ---------------------------------------------------------
+// ---- Settings: birthday ----------------------------------------------------
 
-function showError(message) {
+function showBirthdayError(message) {
   const err = $('birthday-error');
   err.textContent = message;
   err.hidden = !message;
-  $('birthday').setAttribute('aria-invalid', message ? 'true' : 'false');
+  $('set-birthday').setAttribute('aria-invalid', message ? 'true' : 'false');
 }
 
-$('birthday-form').addEventListener('submit', (e) => {
+// Saved as soon as the field holds a usable date. While a date is being typed
+// it passes through unusable values (year 0001, 0019, 0199…); those are only
+// pointed out once the field loses focus.
+$('set-birthday').addEventListener('change', (e) => {
+  const value = e.target.value;
+  if (birthdayError(value, startOfToday())) return;
+  showBirthdayError('');
+  shownBirthday = value;
+  update({ birthday: value });
+});
+
+$('set-birthday').addEventListener('blur', (e) => {
+  const input = e.target;
+  if (input.value === data.birthday && !input.validity.badInput) return;
+  showBirthdayError(birthdayError(input.value, startOfToday()));
+});
+
+$('set-birthday').addEventListener('input', () => showBirthdayError(''));
+
+// ---- Settings: theme -------------------------------------------------------
+
+for (const button of document.querySelectorAll('[data-set-theme]')) {
+  button.addEventListener('click', () => update({ theme: button.dataset.setTheme }));
+}
+
+// ---- Settings: important weeks --------------------------------------------
+
+function showEventError(problem) {
+  const err = $('event-error');
+  err.textContent = problem?.message ?? '';
+  err.hidden = !problem;
+  $('event-date').setAttribute('aria-invalid', problem?.field === 'date' ? 'true' : 'false');
+  $('event-label').setAttribute('aria-invalid', problem?.field === 'label' ? 'true' : 'false');
+}
+
+$('event-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  const value = $('birthday').value;
-  const date = parseISODate(value);
-  if (!date) return showError('Pick your date of birth.');
-  if (date.getFullYear() < 1900) return showError('Pick a date after 1900.');
-  if (date > startOfToday()) return showError('That date is in the future.');
-
-  showError('');
-  data = save({ birthday: toISODate(date) });
-  editing = false;
-  render();
-  $('change-birthday').focus({ preventScroll: true });
+  const date = $('event-date');
+  const label = $('event-label');
+  const problem = eventError(data.birthday, date.value, label.value, YEARS);
+  showEventError(problem);
+  if (problem) {
+    $(EVENT_FIELDS[problem.field]).focus();
+    return;
+  }
+  update({ events: addEvent(data.events, date.value, label.value) });
+  date.value = '';
+  label.value = '';
+  date.focus();
 });
 
-$('birthday').addEventListener('input', () => showError(''));
+$('event-date').addEventListener('input', () => showEventError(null));
+$('event-label').addEventListener('input', () => showEventError(null));
 
-$('change-birthday').addEventListener('click', () => {
-  editing = true;
-  $('birthday').value = data.birthday;
-  showError('');
-  render();
-  $('birthday').focus();
+$('event-list').addEventListener('click', (e) => {
+  const button = e.target.closest('[data-remove]');
+  if (!button) return;
+  const at = [...$('event-list').querySelectorAll('[data-remove]')].indexOf(button);
+  update({ events: removeEvent(data.events, Number(button.dataset.remove)) });
+  // Keep focus in the list: on the item that took this one's place, else the
+  // one before it, else back on the form.
+  const left = $('event-list').querySelectorAll('[data-remove]');
+  (left[Math.min(at, left.length - 1)] ?? $('event-date')).focus();
 });
 
-$('cancel-change').addEventListener('click', () => {
-  editing = false;
-  showError('');
+// ---- Switching screens -----------------------------------------------------
+
+window.addEventListener('hashchange', () => {
+  hidePopover();
+  showBirthdayError('');
+  showEventError(null);
+  shownBirthday = null; // show what is saved, not a half-typed date
   render();
-  $('change-birthday').focus({ preventScroll: true });
+  window.scrollTo(0, 0);
+
+  const screen = currentScreen();
+  const heading =
+    screen === 'settings' ? 'settings-title' : $('weeks-view').hidden ? 'setup-title' : 'weeks-title';
+  $(heading).focus({ preventScroll: true });
 });
 
 // ---- Keep in sync ----------------------------------------------------------
