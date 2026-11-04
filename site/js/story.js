@@ -12,11 +12,14 @@ import { COLORS, weekColor } from './colors.js';
  * Picture formats. Only the vertical story for now. The layout is worked out
  * from a format's size, so another format is another entry here.
  *
+ * The grid fills the width between the side margins. Its height is what is
+ * left after the text, so weeks come out wider than they are tall.
+ *
  * Text stays out of `safeTop` and `safeBottom`: Instagram draws the poster's
  * name over the top of a story and the reply bar over the bottom.
  */
 export const FORMATS = Object.freeze({
-  story: Object.freeze({ id: 'story', width: 1080, height: 1920, safeTop: 180, safeBottom: 180, sideMargin: 90 }),
+  story: Object.freeze({ id: 'story', width: 1080, height: 1920, safeTop: 180, safeBottom: 180, sideMargin: 72 }),
 });
 
 const SANS = "'Geist', system-ui, sans-serif";
@@ -74,17 +77,21 @@ export function siteAddress(href) {
 
 /**
  * The largest whole-pixel grid that fits in `maxWidth` × `maxHeight`.
- * Rows get a little more space between them than columns where it fits,
- * as on the page, so each year reads as a line.
+ * Weeks are as tall as the height allows, then as wide as the width allows
+ * (never narrower than tall), so the grid fills the width. Rows get a
+ * little more space between them than columns where it fits, as on the
+ * page, so each year reads as a line.
  */
 function fitGrid(maxWidth, maxHeight, cols, rows) {
-  for (let cell = 40; cell >= 1; cell--) {
-    const colGap = Math.max(1, Math.round(cell * 0.2));
-    for (const rowGap of [Math.max(colGap, Math.round(cell * 0.3)), colGap]) {
-      const width = cols * cell + (cols - 1) * colGap;
-      const height = rows * cell + (rows - 1) * rowGap;
-      if (width <= maxWidth && height <= maxHeight) {
-        return { cols, rows, cell, colGap, rowGap, width, height };
+  for (let cellH = 40; cellH >= 1; cellH--) {
+    const colGap = Math.max(1, Math.round(cellH * 0.2));
+    const cellW = Math.floor((maxWidth - (cols - 1) * colGap) / cols);
+    if (cellW < cellH) continue;
+    for (const rowGap of [Math.max(colGap, Math.round(cellH * 0.3)), colGap]) {
+      const height = rows * cellH + (rows - 1) * rowGap;
+      if (height <= maxHeight) {
+        const width = cols * cellW + (cols - 1) * colGap;
+        return { cols, rows, cellW, cellH, colGap, rowGap, width, height };
       }
     }
   }
@@ -140,33 +147,34 @@ export function storyLayout(format = FORMATS.story, { years = YEARS, footer = tr
   };
 }
 
-/** The top-left corner and size of week `index` on the grid. */
+/** The top-left corner, width and height of week `index` on the grid. */
 export function cellBox(grid, index) {
   const row = Math.floor(index / grid.cols);
   const col = index % grid.cols;
   return {
-    x: grid.x + col * (grid.cell + grid.colGap),
-    y: grid.y + row * (grid.cell + grid.rowGap),
-    size: grid.cell,
+    x: grid.x + col * (grid.cellW + grid.colGap),
+    y: grid.y + row * (grid.cellH + grid.rowGap),
+    w: grid.cellW,
+    h: grid.cellH,
   };
 }
 
 // ---- Drawing ---------------------------------------------------------------
 
-function addRect(ctx, x, y, size, radius) {
-  if (ctx.roundRect) ctx.roundRect(x, y, size, size, radius);
-  else ctx.rect(x, y, size, size);
+function addRect(ctx, x, y, w, h, radius) {
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, radius);
+  else ctx.rect(x, y, w, h);
 }
 
 /** Fill the weeks at `indexes` in one go, each grown by `grow` on every side. */
 function fillCells(ctx, grid, indexes, color, grow = 0) {
   if (!indexes.length) return;
-  const radius = Math.max(1, Math.round(grid.cell / 5));
+  const radius = Math.max(1, Math.round(grid.cellH / 5));
   ctx.fillStyle = color;
   ctx.beginPath();
   for (const index of indexes) {
     const box = cellBox(grid, index);
-    addRect(ctx, box.x - grow, box.y - grow, box.size + 2 * grow, radius + grow);
+    addRect(ctx, box.x - grow, box.y - grow, box.w + 2 * grow, box.h + 2 * grow, radius + grow);
   }
   ctx.fill();
 }
@@ -204,7 +212,7 @@ function drawMark(ctx, x, y, colors) {
     ctx.globalAlpha = i > 4 ? 0.25 : 1;
     ctx.fillStyle = i === 4 ? colors.now : colors.text;
     ctx.beginPath();
-    addRect(ctx, x + (i % 3) * step, top + Math.floor(i / 3) * step, MARK.square, 1.5);
+    addRect(ctx, x + (i % 3) * step, top + Math.floor(i / 3) * step, MARK.square, MARK.square, 1.5);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -260,7 +268,7 @@ export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, 
   ctx.textAlign = 'right';
   for (let row = 0; row < grid.rows; row += layout.years.every) {
     const box = cellBox(grid, row * grid.cols);
-    ctx.fillText(String(row), layout.years.x, box.y + box.size / 2);
+    ctx.fillText(String(row), layout.years.x, box.y + box.h / 2);
   }
   ctx.textAlign = 'left';
 
@@ -276,8 +284,8 @@ export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, 
 
   // This week and important weeks are drawn a little bigger, with a ring,
   // as on the page.
-  const grow = Math.max(1, Math.round(grid.cell * 0.1));
-  const ring = (share) => grow + Math.max(2, Math.round(grid.cell * share));
+  const grow = Math.max(1, Math.round(grid.cellH * 0.1));
+  const ring = (share) => grow + Math.max(2, Math.round(grid.cellH * share));
   fillCells(ctx, grid, groups.lived, colors.ink);
   fillCells(ctx, grid, groups.ahead, colors.future);
   fillCells(ctx, grid, groups.now, colors.nowA, ring(0.35));
@@ -311,7 +319,7 @@ export function drawStory(ctx, { format = FORMATS.story, stats, events, colors, 
     for (const shade of shades) {
       ctx.fillStyle = shade;
       ctx.beginPath();
-      addRect(ctx, x, Math.round(layout.legend.y - swatch / 2), swatch, 3);
+      addRect(ctx, x, Math.round(layout.legend.y - swatch / 2), swatch, swatch, 3);
       ctx.fill();
       x += swatch + swatchGap;
     }
