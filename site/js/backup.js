@@ -15,9 +15,9 @@ export const BACKUP_APP = 'life-in-weeks';
 
 /**
  * Bump when the file's shape changes; older versions must still restore.
- * 1: birthday, theme and important weeks. 2: adds chapters.
+ * 1: birthday, theme and important weeks. 2: adds chapters. 3: adds the life span.
  */
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
 
 /** Far bigger than any real backup (a week for every square, with long labels, is under 1 MB). */
 export const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
@@ -35,8 +35,8 @@ export function hasData(data) {
  */
 export function backupFile(data, today) {
   const exported = toISODate(today);
-  const { birthday, theme, chapters, events } = clean(data);
-  const body = { app: BACKUP_APP, version: BACKUP_VERSION, exported, birthday, theme, chapters, events };
+  const { birthday, theme, lifespan, chapters, events } = clean(data);
+  const body = { app: BACKUP_APP, version: BACKUP_VERSION, exported, birthday, theme, lifespan, chapters, events };
   return {
     name: `life-in-weeks-backup-${exported}.json`,
     text: `${JSON.stringify(body, null, 2)}\n`,
@@ -58,7 +58,8 @@ export function sizeError(bytes) {
  *
  * Chapters and important weeks go through the same cleaning as a normal
  * load, so one malformed entry is dropped rather than spoiling the rest. A
- * version 1 backup, from before chapters, restores with none.
+ * version 1 backup, from before chapters, restores with none; one from before
+ * the life span restores with the default 100 years.
  */
 export function readBackup(text) {
   let body;

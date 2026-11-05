@@ -366,7 +366,7 @@ function drawMark(ctx, x, y, colors) {
  * is ringed in the this-week color.
  */
 export function drawPicture(ctx, { format = FORMATS.story, stats, events, chapters = new Map(), colors, site = '', text = pictureText(stats) }) {
-  const layout = pictureLayout(format, { years: stats.years, footer: Boolean(site) });
+  const layout = pictureLayout(format, { years: stats.rows ?? stats.years, footer: Boolean(site) });
   const { grid } = layout;
 
   ctx.fillStyle = colors.bg;
@@ -403,7 +403,7 @@ export function drawPicture(ctx, { format = FORMATS.story, stats, events, chapte
   const { ages } = layout;
   ctx.font = `400 ${ages.size}px ${MONO}`;
   ctx.fillStyle = colors.muted;
-  for (let age = 0; age < stats.years; age += ages.every) {
+  for (let age = 0; age < (stats.rows ?? stats.years); age += ages.every) {
     const box = cellBox(grid, age * WEEKS_PER_YEAR);
     if (ages.along === 'left') {
       ctx.textAlign = 'right';
@@ -416,9 +416,15 @@ export function drawPicture(ctx, { format = FORMATS.story, stats, events, chapte
   ctx.textAlign = 'left';
 
   // The weeks.
-  const total = grid.rows * grid.cols;
+  // Weeks past the end of the span are left blank, except where something
+  // is saved on them.
+  const total = Math.min(grid.rows * grid.cols, stats.shown ?? Infinity);
   const groups = { lived: [], ahead: [], now: [], event: [] };
-  for (let i = 0; i < total; i++) groups[cellState(i, stats.nowIndex, events)].push(i);
+  for (let i = 0; i < total; i++) {
+    const state = cellState(i, stats.nowIndex, events, stats.total);
+    if (state !== 'past') groups[state].push(i);
+    else if (chapters.has(i)) groups.ahead.push(i); // a chapter's weeks show, as ahead
+  }
 
   // Important weeks by color, in palette order.
   const byColor = new Map(COLORS.map((c) => [c.id, []]));

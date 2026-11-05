@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, parseISODate, lifeStats, eventsByWeek, chaptersByWeek, weekIndex } from '../site/js/weeks.js';
+import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, parseISODate, lifeStats, reachOf, eventsByWeek, chaptersByWeek, weekIndex } from '../site/js/weeks.js';
 import { FORMATS, PREVIEW, pictureLayout, cellBox, stripeBox, pictureText, pictureColors, siteAddress, drawPicture } from '../site/js/picture.js';
 import { COLORS as PALETTE } from '../site/js/colors.js';
 
@@ -184,19 +184,22 @@ const COLORS = {
   tint: 0.35,
 };
 
-function draw(birthday, today, events = [], site = 'example.github.io/weeks', format = FORMATS.story, chapters = []) {
+function draw(birthday, today, events = [], site = 'example.github.io/weeks', format = FORMATS.story, chapters = [], years = YEARS) {
   const born = d(birthday);
   const ctx = fakeContext();
+  const eventMap = eventsByWeek(born, events);
+  const chapterMap = chaptersByWeek(born, chapters, d(today));
+  const stats = lifeStats(born, d(today), years, reachOf(eventMap, chapterMap));
   drawPicture(ctx, {
     format,
-    stats: lifeStats(born, d(today)),
-    events: eventsByWeek(born, events),
-    chapters: chaptersByWeek(born, chapters, d(today)),
+    stats,
+    events: eventMap,
+    chapters: chapterMap,
     colors: COLORS,
     site,
   });
   // Only what is filled on the grid; the legend and brand mark reuse its colours.
-  const layout = pictureLayout(format, { footer: Boolean(site) });
+  const layout = pictureLayout(format, { years: stats.rows, footer: Boolean(site) });
   const { grid } = layout;
   const onGrid = ([x, y]) => x >= grid.x - 10 && x < grid.x + grid.width && y >= grid.y - 10 && y < grid.y + grid.height;
   // The week you were born, its ring and the gap inside the ring are all
@@ -275,10 +278,11 @@ test('drawPicture leaves out legend entries and the address when there is nothin
   assert.ok(!none.texts.includes('Important week'));
   assert.ok(!none.texts.some((t) => t.includes('github.io')));
 
-  // Past the end of the grid there is no "this week".
+  // Someone past their span still has a "this week": the grid runs on to hold it.
   const past = draw('1920-01-01', '2026-11-04');
-  assert.ok(!past.texts.includes('This week'));
-  assert.equal(past.filled('INK').length + 1, YEARS * WEEKS_PER_YEAR);
+  assert.ok(past.texts.includes('This week'));
+  const lived = lifeStats(d('1920-01-01'), d('2026-11-04')).nowIndex;
+  assert.equal(past.filled('INK').length + 1, lived);
   assert.deepEqual(past.birth, ['NOW', 'BG', 'INK']);
   assert.ok(past.texts.includes('Born'), 'the week you were born is still ringed');
   assert.ok(past.texts.includes('0 weeks ahead.'));

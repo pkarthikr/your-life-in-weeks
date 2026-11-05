@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { STORAGE_KEY, load, save, clean, askToKeep } from '../site/js/storage.js';
 
-const EMPTY = { birthday: '', events: [], chapters: [], theme: 'dark' };
+const EMPTY = { birthday: '', events: [], chapters: [], theme: 'dark', lifespan: { country: '', sex: 'both', custom: null } };
 
 function memoryStore(initial = {}) {
   const items = { ...initial };
@@ -61,7 +61,7 @@ test('load keeps each important week\'s color and defaults the rest to blue', ()
 test('save merges into what is stored and round-trips', () => {
   const store = memoryStore({ [STORAGE_KEY]: JSON.stringify({ theme: 'light', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }] }) });
   const next = save({ birthday: '1990-01-01' }, store);
-  assert.deepEqual(next, { birthday: '1990-01-01', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }], chapters: [], theme: 'light' });
+  assert.deepEqual(next, { birthday: '1990-01-01', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }], chapters: [], theme: 'light', lifespan: EMPTY.lifespan });
   assert.deepEqual(load(store), next);
 });
 
@@ -92,10 +92,10 @@ test('load keeps well-formed chapters, with an id each, and an empty end for one
 test('chapters and important weeks are saved side by side, and data saved before chapters still loads', () => {
   const before = { birthday: '1990-01-01', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }], theme: 'light' };
   const store = memoryStore({ [STORAGE_KEY]: JSON.stringify(before) });
-  assert.deepEqual(load(store), { ...before, chapters: [] });
+  assert.deepEqual(load(store), { ...before, chapters: [], lifespan: EMPTY.lifespan });
   const chapter = { id: 1, start: '2008-08-25', end: '', label: 'College', color: 'violet' };
   save({ chapters: [chapter] }, store);
-  assert.deepEqual(load(store), { ...before, chapters: [chapter] });
+  assert.deepEqual(load(store), { ...before, chapters: [chapter], lifespan: EMPTY.lifespan });
 });
 
 test('clean makes the saved shape from anything', () => {
@@ -108,7 +108,22 @@ test('clean makes the saved shape from anything', () => {
     events: [{ id: 1, date: '2000-01-01', label: 'a', color: 'blue' }],
     chapters: [{ id: 1, start: '2008-08-25', end: '', label: 'College', color: 'blue' }],
     theme: 'light',
+    lifespan: EMPTY.lifespan,
   });
+});
+
+test('the life span is saved, and anything unusable in it is dropped', () => {
+  const store = memoryStore();
+  save({ lifespan: { country: 'IND', sex: 'male', custom: null } }, store);
+  assert.deepEqual(load(store).lifespan, { country: 'IND', sex: 'male', custom: null });
+  save({ lifespan: { country: 'IND', sex: 'male', custom: 120 } }, store);
+  assert.equal(load(store).lifespan.custom, 120);
+
+  for (const odd of ['text', 7, [], { country: 'ZZZ', sex: 'other', custom: 'lots' }, { custom: 0 }, { custom: 151 }, { custom: -3 }, { custom: NaN }]) {
+    assert.deepEqual(clean({ lifespan: odd }).lifespan, EMPTY.lifespan, JSON.stringify(odd));
+  }
+  // What was saved before there was a life span loads with none.
+  assert.deepEqual(load(memoryStore({ [STORAGE_KEY]: JSON.stringify({ birthday: '1990-01-01' }) })).lifespan, EMPTY.lifespan);
 });
 
 /** A stand-in for navigator.storage that records whether persist() was asked. */

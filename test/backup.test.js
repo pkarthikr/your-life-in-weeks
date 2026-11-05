@@ -20,6 +20,7 @@ const today = parseISODate('2026-11-05');
 const DATA = Object.freeze({
   birthday: '1990-06-15',
   theme: 'light',
+  lifespan: { country: 'IND', sex: 'male', custom: 95 },
   chapters: [
     { id: 1, start: '2012-06-01', end: '', label: 'Living in Seattle', color: 'violet' },
   ],
@@ -51,6 +52,7 @@ test('a backup is named for the day it was made and holds everything that is sav
     exported: '2026-11-05',
     birthday: DATA.birthday,
     theme: DATA.theme,
+    lifespan: DATA.lifespan,
     chapters: DATA.chapters,
     events: DATA.events,
   });
@@ -131,10 +133,15 @@ test('important weeks are cleaned the same way as a normal load', () => {
   ]);
 });
 
+test('a backup from before the life span restores with the default', () => {
+  const v2 = JSON.stringify({ app: BACKUP_APP, version: 2, exported: '2026-11-01', birthday: DATA.birthday, theme: DATA.theme, chapters: DATA.chapters, events: DATA.events });
+  assert.deepEqual(readBackup(v2).data.lifespan, { country: '', sex: 'both', custom: null });
+});
+
 test('a version 1 backup, from before chapters, restores with none', () => {
   const v1 = JSON.stringify({ app: BACKUP_APP, version: 1, exported: '2026-11-01', birthday: DATA.birthday, theme: DATA.theme, events: DATA.events });
-  assert.equal(BACKUP_VERSION, 2);
-  assert.deepEqual(readBackup(v1), { data: { ...DATA, chapters: [] }, exported: '2026-11-01' });
+  assert.equal(BACKUP_VERSION, 3);
+  assert.deepEqual(readBackup(v1), { data: { ...DATA, chapters: [], lifespan: { country: '', sex: 'both', custom: null } }, exported: '2026-11-01' });
 });
 
 test('chapters are cleaned the same way as a normal load', () => {
