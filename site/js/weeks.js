@@ -4,8 +4,12 @@
 // Each row has 52 weeks; the last week of a row absorbs the 1–2 leftover
 // days so every row lines up with the next birthday.
 
+/** The span shown until a person picks their own (see lifespan.js). */
 export const YEARS = 100;
 export const WEEKS_PER_YEAR = 52;
+
+/** No span is longer than this, so nothing a person saved is ever cut off the grid. */
+export const MAX_YEARS = 150;
 
 /** The week you were born: always the first square (age 0, week 1). */
 export const BIRTH_WEEK = 0;
@@ -84,22 +88,61 @@ export function weekStart(birth, row, col) {
   return addDays(addYears(birth, row), col * 7);
 }
 
-/** Headline numbers for the page header. */
-export function lifeStats(birth, today, years = YEARS) {
-  const total = years * WEEKS_PER_YEAR;
+/** The weeks in a span of `years`, which may have a fraction (72.4 years). */
+export function totalWeeks(years = YEARS) {
+  return Math.round(years * WEEKS_PER_YEAR);
+}
+
+/**
+ * Headline numbers for the page header.
+ *
+ * `years` is the span the person is counted against; `reach` is the grid
+ * index of the last week they have something on (an important week or a
+ * chapter), or -1. The grid shows the whole span, and runs on past it only
+ * as far as it must to show this week and anything they saved there:
+ *
+ * - `total`: weeks in the span
+ * - `shown`: weeks on the grid, at least `total`
+ * - `rows`: years on the grid, counting a part-year
+ * - `past`: whether the grid runs on past the span
+ *
+ * Someone who has outlived their span has lived `nowIndex` weeks, with none
+ * ahead, and is 100% of the way.
+ */
+export function lifeStats(birth, today, years = YEARS, reach = -1) {
+  const total = totalWeeks(years);
   const now = weekPosition(birth, today) ?? { row: 0, col: 0 };
   const nowIndex = now.row * WEEKS_PER_YEAR + now.col;
-  const lived = Math.min(total, nowIndex);
+  const shown = Math.max(total, nowIndex + 1, reach + 1);
   return {
     years,
     total,
+    shown,
+    rows: Math.ceil(shown / WEEKS_PER_YEAR),
+    past: shown > total,
     age: now.row,
     week: now.col + 1,
     nowIndex,
-    lived,
-    ahead: Math.max(0, total - lived - 1),
-    percent: (lived / total) * 100,
+    lived: nowIndex,
+    ahead: Math.max(0, total - nowIndex - 1),
+    percent: Math.min(100, (nowIndex / total) * 100),
   };
+}
+
+/**
+ * How many years of calendar a new date may fall in: the span, or, for
+ * someone who has outlived it, up to this week. Always a whole number.
+ */
+export function calendarYears(birth, today, years = YEARS) {
+  const pos = weekPosition(birth, today);
+  return Math.max(Math.ceil(years), pos ? pos.row + 1 : 0);
+}
+
+/** The grid index of the last week in any of these maps (grid index → things in that week), or -1 if they are all empty. */
+export function reachOf(...maps) {
+  let reach = -1;
+  for (const map of maps) for (const i of map.keys()) if (i > reach) reach = i;
+  return reach;
 }
 
 /** Important weeks in date order. Events on the same date keep their order. */
@@ -111,11 +154,11 @@ export function sortEvents(events) {
  * Group important weeks by grid index. Events before the birthday or past
  * the end of the grid are dropped. Within a week, events are date-ordered.
  */
-export function eventsByWeek(birth, events, years = YEARS) {
+export function eventsByWeek(birth, events, years = MAX_YEARS) {
   const map = new Map();
   for (const event of sortEvents(events)) {
     const pos = weekPosition(birth, parseISODate(event.date));
-    if (!pos || pos.row >= years) continue;
+    if (!pos || pos.row * WEEKS_PER_YEAR + pos.col >= totalWeeks(years)) continue;
     const index = pos.row * WEEKS_PER_YEAR + pos.col;
     if (!map.has(index)) map.set(index, []);
     map.get(index).push(event);
@@ -146,12 +189,12 @@ export function sortChapters(chapters) {
  * going runs up to the week `today` is in. A part before the birthday or
  * past the end of the grid is cut off.
  */
-export function chapterSpan(birth, chapter, today, years = YEARS) {
+export function chapterSpan(birth, chapter, today, years = MAX_YEARS) {
   const start = parseISODate(chapter.start);
   const end = chapter.end ? parseISODate(chapter.end) : today;
   if (!birth || !start || !end || end < start || end < birth) return null;
   const first = start < birth ? 0 : weekIndex(birth, start);
-  const last = Math.min(years * WEEKS_PER_YEAR - 1, weekIndex(birth, end));
+  const last = Math.min(totalWeeks(years) - 1, weekIndex(birth, end));
   return first <= last ? { first, last } : null;
 }
 
@@ -161,7 +204,7 @@ export function chapterSpan(birth, chapter, today, years = YEARS) {
  * for one that is still going. Without a birthday, or if none of it is on
  * the grid, just the dates.
  */
-export function describeChapter(birth, chapter, today, years = YEARS) {
+export function describeChapter(birth, chapter, today, years = MAX_YEARS) {
   const show = (value) => {
     const date = parseISODate(value);
     return date ? formatDate(date) : value;
@@ -185,7 +228,7 @@ export const CHAPTERS_PER_WEEK = 3;
  * inside another gets the lane after it. A week lists its chapters in
  * lane order, which is the order the grid stacks them in.
  */
-export function chaptersByWeek(birth, chapters, today, years = YEARS) {
+export function chaptersByWeek(birth, chapters, today, years = MAX_YEARS) {
   const placed = chapters
     .map((chapter, order) => ({ chapter, order, span: chapterSpan(birth, chapter, today, years) }))
     .filter((c) => c.span)
@@ -208,12 +251,14 @@ export function chaptersByWeek(birth, chapters, today, years = YEARS) {
 }
 
 /**
- * Classify one cell: 'event', 'now', 'lived' or 'ahead'.
- * An important week wins over every other state.
+ * Classify one cell: 'event', 'lived', 'now', 'past' or 'ahead'.
+ * An important week wins over every other state. 'past' is a week after
+ * this one that is beyond the span (`total` weeks): the grid only shows it
+ * when something the person saved is out there.
  */
-export function cellState(index, nowIndex, events) {
+export function cellState(index, nowIndex, events, total = Infinity) {
   if (events.has(index)) return 'event';
   if (index < nowIndex) return 'lived';
   if (index === nowIndex) return 'now';
-  return 'ahead';
+  return index >= total ? 'past' : 'ahead';
 }

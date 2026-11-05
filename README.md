@@ -1,6 +1,6 @@
 # Life in Weeks
 
-Your whole life on one page: one square per week, one row per year, 100 years.
+Your whole life on one page: one square per week, one row per year, for as many years as you choose to count (100 until you pick).
 
 Inspired by Tim Urban's [Your Life in Weeks](https://waitbutwhy.com/2014/05/life-weeks.html) on Wait But Why.
 
@@ -61,19 +61,28 @@ site/            the whole app, served as-is
   js/colors.js   the colors a chapter or important week can have (their shades are in styles.css)
   js/settings.js pure rules for Settings: checking dates, adding and removing chapters and important weeks
   js/picture.js  the share pictures: their formats, layout and canvas drawing (no DOM)
+  js/lifespan.js how long a life the grid counts: a country's life expectancy or your own number (no DOM)
+  js/life-expectancy.js  WHO life expectancy at birth by country and sex (generated)
   js/storage.js  localStorage read/write, and asking the browser to keep it
   js/backup.js   backup files: writing them and checking them before a restore (no DOM)
 scripts/
+  life-expectancy.mjs  rebuilds js/life-expectancy.js from the WHO API (npm run life-expectancy)
   link-preview.mjs  draws site/link-preview.png (needs Playwright)
 test/            unit tests (node --test)
 ```
+
+## Life span
+
+Settings → **Your life span** sets how many years the grid counts. Pick a country and Average, Male or Female, and it uses that country's life expectancy at birth; or type your own number (1 to 150, decimals fine, e.g. 120), which wins. Until one is chosen it stays at 100 years.
+
+The figures are the World Health Organization's life expectancy at birth ([Global Health Observatory](https://www.who.int/data/gho/data/indicators/indicator-details/GHO/life-expectancy-at-birth-(years)), CC BY-NC-SA 3.0 IGO). They are saved in `site/js/life-expectancy.js`, so the app never looks anything up. To refresh them when WHO publishes a new year, run `npm run life-expectancy` and commit the result. It is an average at birth, not a forecast for any one person.
 
 ## Screens
 
 Both screens are on one page; the address picks which one shows, so the browser's back button and reload work as expected.
 
-- **Weeks** (`#weeks`, the default): the 100-year grid. Chapters color their stretch of weeks, and a line under the legend names each one. Important weeks show in the color you picked for them, over any chapter. Hover a chapter's week or an important week for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. Inside the ring it keeps its own color: lived, its chapters' or an important week's. Before a birthday is saved, it asks you to add one, or to restore a backup (the way in on a new device, or after the browser cleared the site).
-- **Settings** (`#settings`): your birthday, the light or dark theme, your chapters (add when one began, when it ended or nothing if it's still going, a name and a color, or remove one), and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
+- **Weeks** (`#weeks`, the default): the grid, as long as your life span. Weeks beyond the span show only where something is saved there, or if you have outlived it, as faded outlines labelled "Past your span"; nothing saved is ever dropped. Chapters color their stretch of weeks, and a line under the legend names each one. Important weeks show in the color you picked for them, over any chapter. Hover a chapter's week or an important week for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. Inside the ring it keeps its own color: lived, its chapters' or an important week's. Before a birthday is saved, it asks you to add one, or to restore a backup (the way in on a new device, or after the browser cleared the site).
+- **Settings** (`#settings`): your birthday, your life span (below), the light or dark theme, your chapters (add when one began, when it ended or nothing if it's still going, a name and a color, or remove one), and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
   - **Share your weeks** makes a PNG of your whole grid in your current theme, sized for where you'll post it. Save it, or, where the browser supports sharing files (most phones), share it straight to the app. It needs a birthday first.
   - **Backup** downloads everything as a file, or restores one. See below.
   - **About** is a short note on who made the site, with a link to the author's blog, and a link to Tim Urban's original [Your Life in Weeks](https://waitbutwhy.com/2014/05/life-weeks.html) post on Wait But Why. The name, line about the author and blog link are in `index.html`; the photo's Gravatar hash is in `.github/workflows/pages.yml`.

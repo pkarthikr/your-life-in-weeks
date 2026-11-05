@@ -9,7 +9,6 @@
 // `#settings` for Settings, anything else for the weeks.
 
 import {
-  YEARS,
   WEEKS_PER_YEAR,
   BIRTH_WEEK,
   parseISODate,
@@ -19,6 +18,8 @@ import {
   startOfToday,
   weekStart,
   lifeStats,
+  calendarYears,
+  reachOf,
   eventsByWeek,
   sortEvents,
   cellState,
@@ -41,6 +42,16 @@ import {
   removeChapter,
   nextChapterColor,
 } from './settings.js';
+import {
+  COUNTRIES,
+  SEXES,
+  MIN_LIFESPAN,
+  MAX_LIFESPAN,
+  lifespanYears,
+  customError,
+  describeLifespan,
+  formatYears,
+} from './lifespan.js';
 import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
 import { FORMATS, PICTURE_FONTS, drawPicture, pictureColors, pictureText, siteAddress } from './picture.js';
 import { hasData, backupFile, sizeError, readBackup, summary, exportedOn } from './backup.js';
@@ -50,7 +61,7 @@ const fmtInt = (n) => n.toLocaleString('en-US');
 
 const POP_HALF = 120; // half the popover's width, keeps it inside the grid
 
-const CELL_CLASS = { lived: 'w', ahead: 'w f', now: 'w n', event: 'w s' };
+const CELL_CLASS = { lived: 'w', ahead: 'w f', now: 'w n', event: 'w s', past: 'w f beyond' };
 
 const TITLES = { weeks: 'Life in Weeks', settings: 'Settings · Life in Weeks' };
 
@@ -120,11 +131,35 @@ function render() {
   else if (hasBirthday) renderWeeks(birth, today);
 }
 
-function renderWeeks(birth, today) {
-  const stats = lifeStats(birth, today, YEARS);
+/** The calendar the add forms check dates against (see calendarYears), for the saved birthday. */
+function formYears() {
+  const birth = parseISODate(data.birthday);
+  return birth ? calendarYearsFor(birth, startOfToday()) : spanYears();
+}
 
-  $('years').textContent = stats.years;
-  $('years-2').textContent = stats.years;
+/** The years the grid counts against: the person's own number, their country's, or 100. */
+const spanYears = () => lifespanYears(data.lifespan).years;
+
+/** How many years of calendar a date may fall in, for the form checks. */
+const calendarYearsFor = (birth, today) => calendarYears(birth, today, spanYears());
+
+/**
+ * The grid's numbers and what is on it. The grid is the whole span and runs
+ * on past it only as far as this week and anything saved there need.
+ */
+function gridFor(birth, today) {
+  const events = eventsByWeek(birth, data.events);
+  const chapters = chaptersByWeek(birth, data.chapters, today);
+  const stats = lifeStats(birth, today, spanYears(), reachOf(events, chapters));
+  return { stats, events, chapters };
+}
+
+function renderWeeks(birth, today) {
+  const grid = gridFor(birth, today);
+  const { stats } = grid;
+
+  $('years').textContent = formatYears(stats.years);
+  $('years-2').textContent = formatYears(stats.years);
   $('total').textContent = fmtInt(stats.total);
   $('born').textContent = formatDate(birth);
   $('week').textContent = stats.week;
@@ -139,8 +174,8 @@ function renderWeeks(birth, today) {
     `${fmtInt(stats.lived)} of ${fmtInt(stats.total)} weeks lived, ${fmtInt(stats.ahead)} ahead.`,
   );
 
-  events = eventsByWeek(birth, data.events, YEARS);
-  chapters = chaptersByWeek(birth, data.chapters, today, YEARS);
+  events = grid.events;
+  chapters = grid.chapters;
   currentBirth = birth;
   currentToday = today;
   currentNowIndex = stats.nowIndex;
@@ -148,12 +183,21 @@ function renderWeeks(birth, today) {
   // Rebuilding 5,200 cells is cheap but not free; only do it when the
   // inputs that shape the grid change. A chapter that is still going grows
   // with this week, which is in the key.
-  const key = [toISODate(birth), stats.nowIndex, JSON.stringify(data.events), JSON.stringify(data.chapters)].join('|');
+  const key = [
+    toISODate(birth),
+    stats.nowIndex,
+    stats.total,
+    stats.shown,
+    JSON.stringify(data.events),
+    JSON.stringify(data.chapters),
+  ].join('|');
   if (key !== gridKey) {
     gridKey = key;
     hidePopover();
-    buildGrid(birth, stats.nowIndex);
+    buildGrid(birth, stats);
   }
+  // Only when some square is faded: someone past their span has lived those weeks.
+  $('leg-past').hidden = stats.shown <= Math.max(stats.total, stats.nowIndex + 1);
 }
 
 function buildAxis() {
@@ -169,13 +213,14 @@ function buildAxis() {
   axis.append(frag);
 }
 
-function buildGrid(birth, nowIndex) {
+function buildGrid(birth, stats) {
+  const { nowIndex } = stats;
   buildAxis();
   const rows = $('rows');
   rows.querySelectorAll('.row').forEach((row) => row.remove());
 
   const frag = document.createDocumentFragment();
-  for (let r = 0; r < YEARS; r++) {
+  for (let r = 0; r < stats.rows; r++) {
     const row = document.createElement('div');
     row.className = 'row';
 
@@ -188,7 +233,8 @@ function buildGrid(birth, nowIndex) {
 
     for (let c = 0; c < WEEKS_PER_YEAR; c++) {
       const i = r * WEEKS_PER_YEAR + c;
-      const state = cellState(i, nowIndex, events);
+      if (i >= stats.shown) break; // the span ends part-way through a year
+      const state = cellState(i, nowIndex, events, stats.total);
       const inChapters = chapters.get(i);
       const cell = document.createElement('span');
       cell.className = CELL_CLASS[state];
@@ -213,7 +259,8 @@ function buildGrid(birth, nowIndex) {
       } else {
         cell.title =
           `Age ${r} · week ${c + 1} · ${formatDate(weekStart(birth, r, c))}` +
-          (state === 'now' ? ' · this week' : '');
+          (state === 'now' ? ' · this week' : '') +
+          (state === 'past' ? ' · past your span' : '');
       }
       cells.append(cell);
     }
@@ -238,12 +285,13 @@ function renderSettings(birth, today) {
   for (const button of document.querySelectorAll('[data-set-theme]')) {
     button.setAttribute('aria-pressed', String(button.dataset.setTheme === data.theme));
   }
+  renderLifespan();
 
   // Every date field offers only the days on the calendar.
   for (const date of [$('event-date'), $('chapter-start'), $('chapter-end')]) {
     if (birth) {
       date.min = toISODate(birth);
-      date.max = toISODate(lastCalendarDay(birth, YEARS));
+      date.max = toISODate(lastCalendarDay(birth, calendarYearsFor(birth, today)));
     } else {
       date.removeAttribute('min');
       date.removeAttribute('max');
@@ -295,7 +343,7 @@ function eventItem(event, birth) {
 }
 
 function chapterItem(chapter, birth, today) {
-  return listItem({ ...chapter, meta: describeChapter(birth, chapter, today, YEARS) });
+  return listItem({ ...chapter, meta: describeChapter(birth, chapter, today) });
 }
 
 // ---- Week popover ------------------------------------------------------------
@@ -308,7 +356,7 @@ function popChapter(chapter) {
   const line = $('pop-chapter').content.firstElementChild.cloneNode(true);
   line.classList.add(`c-${chapter.color}`);
   line.querySelector('.pop-ch-name').textContent = chapter.label;
-  line.querySelector('.pop-ch-when').textContent = describeChapter(currentBirth, chapter, currentToday, YEARS);
+  line.querySelector('.pop-ch-when').textContent = describeChapter(currentBirth, chapter, currentToday);
   return line;
 }
 
@@ -392,6 +440,63 @@ for (const button of document.querySelectorAll('[data-set-theme]')) {
   button.addEventListener('click', () => update({ theme: button.dataset.setTheme }));
 }
 
+// ---- Settings: life span ----------------------------------------------------
+//
+// A country and a sex give a life expectancy to count against; a number of
+// the person's own overrides it. Saved as soon as it is usable.
+
+function buildLifespanControls() {
+  const select = $('set-country');
+  select.append(new Option('Choose a country', ''));
+  for (const country of COUNTRIES) select.append(new Option(country.name, country.code));
+
+  const seg = $('sex-seg');
+  for (const sex of SEXES) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'segb';
+    button.dataset.setSex = sex.id;
+    button.textContent = sex.label;
+    button.addEventListener('click', () => update({ lifespan: { ...data.lifespan, sex: sex.id } }));
+    seg.append(button);
+  }
+
+  const custom = $('set-custom');
+  custom.min = String(MIN_LIFESPAN);
+  custom.max = String(MAX_LIFESPAN);
+  select.addEventListener('change', () => update({ lifespan: { ...data.lifespan, country: select.value } }));
+  custom.addEventListener('input', () => showLifespanError(''));
+  // Not on every key: 7 on the way to 72 must not shrink the calendar to 7 years.
+  custom.addEventListener('change', () => {
+    const problem = customError(custom.value);
+    showLifespanError(problem);
+    if (problem) return;
+    const value = custom.value.trim();
+    update({ lifespan: { ...data.lifespan, custom: value === '' ? null : Number(value) } });
+  });
+}
+
+function showLifespanError(message) {
+  const err = $('lifespan-error');
+  err.textContent = message;
+  err.hidden = !message;
+  $('set-custom').setAttribute('aria-invalid', message ? 'true' : 'false');
+}
+
+function renderLifespan() {
+  $('set-country').value = data.lifespan.country;
+  for (const button of document.querySelectorAll('[data-set-sex]')) {
+    button.setAttribute('aria-pressed', String(button.dataset.setSex === data.lifespan.sex));
+  }
+  const custom = $('set-custom');
+  if (document.activeElement !== custom) {
+    custom.value = data.lifespan.custom === null ? '' : String(data.lifespan.custom);
+  }
+  $('lifespan-note').textContent = describeLifespan(data.lifespan);
+}
+
+buildLifespanControls();
+
 // ---- Settings: color pickers ------------------------------------------------
 //
 // Chapters and important weeks each have a picker with the same colors.
@@ -465,7 +570,7 @@ $('chapter-form').addEventListener('submit', (e) => {
   const label = $('chapter-label');
   // A half-typed date reads as empty; don't take it to mean "still going".
   const endValue = end.validity.badInput ? '?' : end.value;
-  const problem = chapterError(data.birthday, start.value, endValue, label.value, startOfToday(), YEARS);
+  const problem = chapterError(data.birthday, start.value, endValue, label.value, startOfToday(), formYears());
   showChapterError(problem);
   if (problem) {
     $(CHAPTER_FIELDS[problem.field]).focus();
@@ -544,7 +649,7 @@ $('event-form').addEventListener('submit', (e) => {
   e.preventDefault();
   const date = $('event-date');
   const label = $('event-label');
-  const problem = eventError(data.birthday, date.value, label.value, YEARS);
+  const problem = eventError(data.birthday, date.value, label.value, formYears());
   showEventError(problem);
   if (problem) {
     $(EVENT_FIELDS[problem.field]).focus();
@@ -639,7 +744,7 @@ function themeColors() {
 async function makePicture(format) {
   const today = startOfToday();
   const birth = parseISODate(data.birthday);
-  const stats = lifeStats(birth, today, YEARS);
+  const { stats, events, chapters } = gridFor(birth, today);
 
   // Draw with the page's fonts. If they can't load, system fonts stand in.
   await Promise.all(PICTURE_FONTS.map((font) => document.fonts?.load(font))).catch(() => {});
@@ -650,8 +755,8 @@ async function makePicture(format) {
   drawPicture(canvas.getContext('2d'), {
     format,
     stats,
-    events: eventsByWeek(birth, data.events, YEARS),
-    chapters: chaptersByWeek(birth, data.chapters, today, YEARS),
+    events,
+    chapters,
     colors: themeColors(),
     site: siteAddress(location.href),
   });
@@ -891,6 +996,7 @@ window.addEventListener('hashchange', () => {
   if ($('restore-dialog').open) $('restore-dialog').close();
   hidePopover();
   showBirthdayError('');
+  showLifespanError('');
   stopEditingChapter();
   stopEditingEvent();
   setBackupStatus('');

@@ -77,6 +77,7 @@
         <span class="leg"><span class="lg lg-lived"></span>Lived</span>
         <span class="leg"><span class="lg lg-ahead"></span>Ahead</span>
         <span class="leg"><span class="lg lg-now"></span>This week</span>
+        <span class="leg" id="leg-past" hidden><span class="lg lg-past"></span>Past your span</span>
       </div>
       <div class="row"><span class="yl"></span><div class="cells" id="axis"></div></div>
       <div class="rows" id="rows" role="img">
@@ -111,6 +112,30 @@
         <input id="set-birthday" class="in" type="date" min="1900-01-01" aria-describedby="birthday-error">
       </div>
       <p class="err" id="birthday-error" role="alert" hidden></p>
+    </section>
+
+    <section class="card" aria-labelledby="s-lifespan">
+      <div class="card-head">
+        <h2 id="s-lifespan" class="h2">Your life span</h2>
+        <p class="lab" id="lifespan-hint">How many years your calendar counts. Be guided by life expectancy where you live, or set your own number.</p>
+      </div>
+      <div class="span-form">
+        <div class="field field-country">
+          <label class="lab" for="set-country">Country</label>
+          <select id="set-country" class="in" aria-describedby="lifespan-note"></select>
+        </div>
+        <div class="field field-sex">
+          <span class="lab" id="sex-label">Life expectancy for</span>
+          <div class="seg" role="group" aria-labelledby="sex-label" id="sex-seg"></div>
+        </div>
+        <div class="field field-custom">
+          <label class="lab" for="set-custom">Or your own, in years</label>
+          <input id="set-custom" class="in" type="number" inputmode="decimal" step="any" placeholder="e.g. 120" aria-describedby="lifespan-error lifespan-note">
+        </div>
+      </div>
+      <p class="err" id="lifespan-error" role="alert" hidden></p>
+      <p class="lab" id="lifespan-note" role="status"></p>
+      <p class="lab">Life expectancy is an average at birth, not a forecast for you. Weeks past your span stay on the calendar, faded, so nothing you saved is lost.</p>
     </section>
 
     <section class="card" aria-labelledby="s-appearance">
@@ -221,6 +246,7 @@
         </div>
       </div>
       <p class="credit">Based on Tim Urban's <a class="link" href="https://waitbutwhy.com/2014/05/life-weeks.html">Your Life in Weeks</a> on Wait But Why, where the idea of one square per week comes from.</p>
+      <p class="credit">Life expectancy figures are the <a class="link" href="https://www.who.int/data/gho/data/indicators/indicator-details/GHO/life-expectancy-at-birth-(years)">World Health Organization’s</a> estimates of life expectancy at birth (<abbr title="Creative Commons Attribution-NonCommercial-ShareAlike 3.0 IGO">CC BY-NC-SA 3.0 IGO</abbr>), saved with this site so nothing is looked up when you use it.</p>
     </section>
 
     <div class="settings-foot">

@@ -12,6 +12,10 @@ import {
   weekPosition,
   weekStart,
   lifeStats,
+  reachOf,
+  calendarYears,
+  totalWeeks,
+  MAX_YEARS,
   eventsByWeek,
   sortEvents,
   cellState,
@@ -113,11 +117,52 @@ test('lifeStats mid-life', () => {
   assert.equal(s.lived + 1 + s.ahead, s.total);
 });
 
-test('lifeStats past the end of the grid caps at 100%', () => {
+test('lifeStats past the end of the span counts every week lived, with none ahead', () => {
   const s = lifeStats(d('1920-01-01'), d('2026-11-04'));
-  assert.equal(s.lived, s.total);
+  assert.equal(s.lived, s.nowIndex);
+  assert.ok(s.lived > s.total);
   assert.equal(s.ahead, 0);
   assert.equal(s.percent, 100);
+  // The grid runs on just far enough to show this week.
+  assert.equal(s.shown, s.nowIndex + 1);
+  assert.equal(s.rows, 107);
+  assert.equal(s.past, true);
+});
+
+test('lifeStats takes any span, including part of a year', () => {
+  const s = lifeStats(d('1990-01-01'), d('2026-11-04'), 72.4);
+  assert.equal(s.total, 3765); // 72.4 × 52, rounded
+  assert.equal(s.shown, 3765);
+  assert.equal(s.rows, 73); // the last row is part of a year
+  assert.equal(s.past, false);
+  assert.equal(s.lived + 1 + s.ahead, s.total);
+
+  const long = lifeStats(d('1990-01-01'), d('2026-11-04'), 120);
+  assert.equal(long.total, 6240);
+  assert.equal(long.rows, 120);
+});
+
+test('the grid runs on past the span to hold what is saved there', () => {
+  const s = lifeStats(d('1990-01-01'), d('2026-11-04'), 40, 45 * 52);
+  assert.equal(s.total, 2080);
+  assert.equal(s.shown, 45 * 52 + 1);
+  assert.equal(s.past, true);
+  assert.equal(s.ahead, s.total - s.nowIndex - 1); // saved weeks don't change the span
+  assert.equal(reachOf(new Map([[3, 1]]), new Map([[9, 1], [5, 1]])), 9);
+  assert.equal(reachOf(new Map()), -1);
+});
+
+test('calendarYears covers the span, or this week for someone past it', () => {
+  assert.equal(calendarYears(d('1990-01-01'), d('2026-11-04'), 72.4), 73);
+  assert.equal(calendarYears(d('1990-01-01'), d('2026-11-04'), 30), 37);
+  assert.equal(totalWeeks(100), 5200);
+});
+
+test('events and chapters beyond the span are kept, up to MAX_YEARS', () => {
+  const b = d('1990-01-01');
+  assert.equal(eventsByWeek(b, [{ date: '2070-01-01', label: 'x' }]).size, 1);
+  assert.equal(eventsByWeek(b, [{ date: '2200-01-01', label: 'x' }]).size, 0);
+  assert.equal(MAX_YEARS, 150);
 });
 
 test('eventsByWeek groups, sorts and drops out-of-range events', () => {
@@ -129,7 +174,7 @@ test('eventsByWeek groups, sorts and drops out-of-range events', () => {
     { id: 4, date: '2090-01-01', label: 'Past the grid' },
     { id: 5, date: 'garbage', label: 'Bad date' },
     { id: 6, date: '2089-12-31', label: 'Last week of the grid' },
-  ]);
+  ], YEARS);
   assert.equal(map.size, 2);
   assert.ok(map.has(YEARS * 52 - 1));
   const [index, list] = [...map][0];
@@ -154,6 +199,10 @@ test('cellState', () => {
   assert.equal(cellState(3, 3, events), 'now');
   assert.equal(cellState(4, 3, events), 'ahead');
   assert.equal(cellState(5, 3, events), 'event');
+  assert.equal(cellState(4, 3, events, 4), 'past');
+  assert.equal(cellState(4, 3, events, 5), 'ahead');
+  assert.equal(cellState(2, 3, events, 1), 'lived'); // outlived: still lived
+  assert.equal(cellState(5, 3, events, 4), 'event');
 });
 
 // ---- Chapters -----------------------------------------------------------------
@@ -190,11 +239,11 @@ test('chapterSpan cuts off what is not on the grid', () => {
   assert.deepEqual(chapterSpan(born, ch(1, '1985-01-01', '1991-01-01'), today), { first: 0, last: at('1991-01-01') });
   assert.equal(chapterSpan(born, ch(1, '1985-01-01', '1989-01-01'), today), null);
   // Runs past the end of the grid, or begins after it.
-  assert.deepEqual(chapterSpan(born, ch(1, '2080-01-01', '2095-01-01'), today), { first: at('2080-01-01'), last: YEARS * WEEKS_PER_YEAR - 1 });
-  assert.equal(chapterSpan(born, ch(1, '2091-01-01', '2095-01-01'), today), null);
+  assert.deepEqual(chapterSpan(born, ch(1, '2080-01-01', '2095-01-01'), today, YEARS), { first: at('2080-01-01'), last: YEARS * WEEKS_PER_YEAR - 1 });
+  assert.equal(chapterSpan(born, ch(1, '2091-01-01', '2095-01-01'), today, YEARS), null);
   // Someone older than the grid with a chapter still going.
   const old = d('1920-01-01');
-  assert.deepEqual(chapterSpan(old, ch(1, '2015-01-01', ''), today).last, YEARS * WEEKS_PER_YEAR - 1);
+  assert.deepEqual(chapterSpan(old, ch(1, '2015-01-01', ''), today, YEARS).last, YEARS * WEEKS_PER_YEAR - 1);
 });
 
 test('chapterSpan is null for a chapter it cannot place', () => {

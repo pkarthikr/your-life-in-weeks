@@ -462,6 +462,7 @@ a { color: inherit; }
 .lg-ahead { background: var(--future); }
 .lg-now { background: var(--now); }
 .lg-mark { background: var(--mark); }
+.lg-past { background: none; box-shadow: inset 0 0 0 1px var(--future); }
 
 .rows {
   display: flex;
@@ -562,6 +563,16 @@ a { color: inherit; }
   position: relative;
   z-index: 2;
 }
+
+/* A week past the end of the span, shown only where something is saved or
+   this week has gone beyond it: an outline, so it reads as "beyond" rather
+   than "ahead". */
+.w.beyond {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--future);
+}
+
+.w.beyond.ch > i { opacity: .5; }
 
 @keyframes pulse {
   0% { box-shadow: 0 0 0 0 var(--nowA); }
@@ -1241,4 +1252,27 @@ a { color: inherit; }
   margin: 0;
   font-size: 13px;
   color: var(--muted);
+}
+
+/* Life span: country, whose life expectancy, or a number of your own. */
+.span-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.field-country { flex: 2 1 220px; }
+.field-sex { flex: 1 1 220px; }
+.field-custom { flex: 1 1 140px; }
+
+select.in {
+  appearance: none;
+  padding-right: 36px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 19px) 19px, calc(100% - 14px) 19px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
 }
