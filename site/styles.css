@@ -462,23 +462,6 @@ a { color: inherit; }
 .lg-ahead { background: var(--future); }
 .lg-now { background: var(--now); }
 .lg-mark { background: var(--mark); }
-.lg-born {
-  background: var(--ink);
-  box-shadow: var(--born-ring);
-  margin: 0 3px;
-}
-
-/* The chapters on the grid, by name, on a line of their own. */
-.legend-chapters {
-  margin: -6px 0 0;
-  list-style: none;
-}
-
-/* The colors of the important weeks on the grid, side by side. */
-.lg-set {
-  display: flex;
-  gap: 3px;
-}
 
 .rows {
   display: flex;
@@ -1052,11 +1035,10 @@ a { color: inherit; }
   color: var(--muted);
 }
 
-/* Remove button on each important week. */
+/* Edit and remove buttons on each chapter and important week. */
 .x {
   width: 44px;
   height: 44px;
-  margin-left: auto;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -1067,6 +1049,8 @@ a { color: inherit; }
   justify-content: center;
   flex: none;
 }
+
+.x-edit { margin-left: auto; }
 
 .x:hover {
   color: var(--text);

@@ -7,9 +7,11 @@ import {
   eventError,
   lastCalendarDay,
   addEvent,
+  updateEvent,
   removeEvent,
   chapterError,
   addChapter,
+  updateChapter,
   removeChapter,
   nextChapterColor,
 } from '../site/js/settings.js';
@@ -76,6 +78,17 @@ test('addEvent falls back to the default color', () => {
   assert.equal(addEvent([], '2015-03-02', 'x', 'neon').at(-1).color, 'blue');
 });
 
+test('updateEvent changes only the matching id, in place', () => {
+  const events = [{ id: 1, date: '2010-01-01', label: 'A', color: 'blue' }, { id: 2, date: '2012-01-01', label: 'B', color: 'pink' }];
+  assert.deepEqual(updateEvent(events, 2, '2013-02-02', '  Bee ', 'green'), [
+    events[0],
+    { id: 2, date: '2013-02-02', label: 'Bee', color: 'green' },
+  ]);
+  assert.equal(updateEvent(events, 2, '2013-02-02', 'x', 'neon')[1].color, 'blue');
+  assert.deepEqual(updateEvent(events, 9, '2013-02-02', 'x', 'green'), events);
+  assert.equal(events[1].label, 'B', 'does not change the list it was given');
+});
+
 test('removeEvent drops only the matching id', () => {
   const events = [{ id: 1, date: '2010-01-01', label: 'A' }, { id: 2, date: '2012-01-01', label: 'B' }];
   assert.deepEqual(removeEvent(events, 1), [{ id: 2, date: '2012-01-01', label: 'B' }]);
@@ -126,6 +139,19 @@ test('addChapter appends with the next free id, trims the name and keeps the col
   assert.deepEqual(next.at(-1), { id: 4, start: '2019-09-01', end: '', label: 'London', color: 'blue' });
   assert.equal(addChapter([], '2019-09-01', undefined, 'x').at(-1).end, '');
   assert.equal(chapters.length, 1, 'does not change the list it was given');
+});
+
+test('updateChapter changes only the matching id, in place', () => {
+  const chapters = [
+    { id: 1, start: '2008-08-25', end: '', label: 'A', color: 'blue' },
+    { id: 2, start: '2010-01-01', end: '2012-01-01', label: 'B', color: 'pink' },
+  ];
+  assert.deepEqual(updateChapter(chapters, 2, '2010-02-01', '', ' Bee ', 'green'), [
+    chapters[0],
+    { id: 2, start: '2010-02-01', end: '', label: 'Bee', color: 'green' },
+  ]);
+  assert.deepEqual(updateChapter(chapters, 9, '2010-02-01', '', 'x', 'green'), chapters);
+  assert.equal(chapters[1].label, 'B', 'does not change the list it was given');
 });
 
 test('removeChapter drops only the matching id', () => {
