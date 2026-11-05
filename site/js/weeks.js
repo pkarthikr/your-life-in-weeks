@@ -5,7 +5,7 @@
 // days so every row lines up with the next birthday.
 
 /** The span shown until a person picks their own (see lifespan.js). */
-export const YEARS = 100;
+export const YEARS = 90;
 export const WEEKS_PER_YEAR = 52;
 
 /** No span is longer than this, so nothing a person saved is ever cut off the grid. */

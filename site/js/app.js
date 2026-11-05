@@ -137,7 +137,7 @@ function formYears() {
   return birth ? calendarYearsFor(birth, startOfToday()) : spanYears();
 }
 
-/** The years the grid counts against: the person's own number, their country's, or 100. */
+/** The years the grid counts against: the person's own number, their country's, or 90. */
 const spanYears = () => lifespanYears(data.lifespan).years;
 
 /** How many years of calendar a date may fall in, for the form checks. */
@@ -180,7 +180,7 @@ function renderWeeks(birth, today) {
   currentToday = today;
   currentNowIndex = stats.nowIndex;
 
-  // Rebuilding 5,200 cells is cheap but not free; only do it when the
+  // Rebuilding thousands of cells is cheap but not free; only do it when the
   // inputs that shape the grid change. A chapter that is still going grows
   // with this week, which is in the key.
   const key = [

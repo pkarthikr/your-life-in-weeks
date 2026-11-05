@@ -59,7 +59,7 @@ export function sizeError(bytes) {
  * Chapters and important weeks go through the same cleaning as a normal
  * load, so one malformed entry is dropped rather than spoiling the rest. A
  * version 1 backup, from before chapters, restores with none; one from before
- * the life span restores with the default 100 years.
+ * the life span restores with the default 90 years.
  */
 export function readBackup(text) {
   let body;

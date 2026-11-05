@@ -90,11 +90,11 @@ test('weekStart is the inverse of weekPosition', () => {
   }
 });
 
-test('the grid covers 100 years', () => {
-  assert.equal(YEARS, 100);
-  const s = lifeStats(d('1931-11-10'), d('2026-11-04')); // 94 years old
-  assert.equal(s.total, 5200);
-  assert.equal(s.age, 94);
+test('the grid covers 90 years by default', () => {
+  assert.equal(YEARS, 90);
+  const s = lifeStats(d('1941-11-01'), d('2026-11-04')); // 85 years old
+  assert.equal(s.total, 4680);
+  assert.equal(s.age, 85);
   assert.ok(s.ahead > 0);
 });
 
@@ -171,9 +171,9 @@ test('eventsByWeek groups, sorts and drops out-of-range events', () => {
     { id: 2, date: '2015-03-04', label: 'Second' },
     { id: 1, date: '2015-03-02', label: 'First' },
     { id: 3, date: '1989-12-31', label: 'Before birth' },
-    { id: 4, date: '2090-01-01', label: 'Past the grid' },
+    { id: 4, date: '2080-01-01', label: 'Past the grid' },
     { id: 5, date: 'garbage', label: 'Bad date' },
-    { id: 6, date: '2089-12-31', label: 'Last week of the grid' },
+    { id: 6, date: '2079-12-31', label: 'Last week of the grid' },
   ], YEARS);
   assert.equal(map.size, 2);
   assert.ok(map.has(YEARS * 52 - 1));
@@ -239,11 +239,11 @@ test('chapterSpan cuts off what is not on the grid', () => {
   assert.deepEqual(chapterSpan(born, ch(1, '1985-01-01', '1991-01-01'), today), { first: 0, last: at('1991-01-01') });
   assert.equal(chapterSpan(born, ch(1, '1985-01-01', '1989-01-01'), today), null);
   // Runs past the end of the grid, or begins after it.
-  assert.deepEqual(chapterSpan(born, ch(1, '2080-01-01', '2095-01-01'), today, YEARS), { first: at('2080-01-01'), last: YEARS * WEEKS_PER_YEAR - 1 });
-  assert.equal(chapterSpan(born, ch(1, '2091-01-01', '2095-01-01'), today, YEARS), null);
+  assert.deepEqual(chapterSpan(born, ch(1, '2070-01-01', '2095-01-01'), today, YEARS), { first: at('2070-01-01'), last: YEARS * WEEKS_PER_YEAR - 1 });
+  assert.equal(chapterSpan(born, ch(1, '2081-01-01', '2095-01-01'), today, YEARS), null);
   // Someone older than the grid with a chapter still going.
   const old = d('1920-01-01');
-  assert.deepEqual(chapterSpan(old, ch(1, '2015-01-01', ''), today, YEARS).last, YEARS * WEEKS_PER_YEAR - 1);
+  assert.deepEqual(chapterSpan(old, ch(1, '2005-01-01', ''), today, YEARS).last, YEARS * WEEKS_PER_YEAR - 1);
 });
 
 test('chapterSpan is null for a chapter it cannot place', () => {

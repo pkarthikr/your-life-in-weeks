@@ -75,14 +75,14 @@ test('the link preview is 1200 × 630, has no Share button, and its weeks fill t
   assert.deepEqual([grid.cols, grid.rows], [YEARS, WEEKS_PER_YEAR]);
   // 52 weeks in 630 pixels, under the title, leave them short; they stay
   // whole pixels, apart, and no narrower than they are tall.
-  assert.deepEqual([grid.cellW, grid.cellH, grid.colGap, grid.rowGap], [9, 5, 1, 1]);
+  assert.deepEqual([grid.cellW, grid.cellH, grid.colGap, grid.rowGap], [10, 5, 1, 1]);
   const room = PREVIEW.width - 2 * PREVIEW.margin.side;
   assert.ok(grid.width <= room && room - grid.width < grid.cols, `${grid.width} of ${room}px`);
 });
 
-test('the story keeps the weeks it was approved with: 16 × 10 with 2px gaps', () => {
+test('the story fits 16 × 11 weeks with 2px gaps', () => {
   const { grid } = pictureLayout(FORMATS.story);
-  assert.deepEqual([grid.cellW, grid.cellH, grid.colGap, grid.rowGap], [16, 10, 2, 2]);
+  assert.deepEqual([grid.cellW, grid.cellH, grid.colGap, grid.rowGap], [16, 11, 2, 2]);
 });
 
 test('cellBox walks a grid of rows year by year, down the picture', () => {
@@ -117,7 +117,7 @@ test('pictureText counts weeks lived and ahead', () => {
   const text = pictureText(lifeStats(d('1990-01-01'), d('2026-11-04')));
   assert.equal(text.eyebrow, 'My life in weeks');
   assert.equal(text.lived, '1,915 weeks lived.');
-  assert.equal(text.ahead, '3,284 weeks ahead.');
+  assert.equal(text.ahead, '2,764 weeks ahead.');
 });
 
 test('pictureText says "week" for one', () => {
@@ -266,8 +266,8 @@ test('drawPicture paints each important week in its own color, and the legend sh
 test('drawPicture writes the title, ages, legend and address, and no event labels', () => {
   const { texts } = draw('1990-01-01', '2026-11-04', [{ id: 1, date: '2015-03-02', label: 'Secret', color: 'teal' }]);
   assert.ok(texts.includes('1,915 weeks lived.'));
-  assert.ok(texts.includes('3,284 weeks ahead.'));
-  assert.deepEqual(texts.filter((t) => /^\d+$/.test(t)), ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90']);
+  assert.ok(texts.includes('2,764 weeks ahead.'));
+  assert.deepEqual(texts.filter((t) => /^\d+$/.test(t)), ['0', '10', '20', '30', '40', '50', '60', '70', '80']);
   for (const label of ['Lived', 'Ahead', 'This week', 'Born', 'Important week']) assert.ok(texts.includes(label), label);
   assert.ok(texts.includes('example.github.io/weeks'));
   assert.ok(!texts.some((t) => t.includes('Secret')), 'important-week labels stay private');
@@ -328,7 +328,7 @@ test('drawPicture writes the text it is given in place of the counts', () => {
 test('the X picture puts lived and ahead on one line, and the address beside the legend', () => {
   const { textCalls, layout } = draw('1990-01-01', '2026-11-04', [], 'example.github.io/weeks', FORMATS.x);
   const lived = textCalls.find((c) => c.text === '1,915 weeks lived.');
-  const ahead = textCalls.find((c) => c.text === '3,284 weeks ahead.');
+  const ahead = textCalls.find((c) => c.text === '2,764 weeks ahead.');
   assert.equal(lived.y, ahead.y);
   assert.ok(ahead.x > lived.x);
   const site = textCalls.find((c) => c.text === 'example.github.io/weeks');
@@ -338,7 +338,7 @@ test('the X picture puts lived and ahead on one line, and the address beside the
 test('a grid of columns has its ages along the bottom, at the start of each decade', () => {
   const { textCalls, layout } = draw('1990-01-01', '2026-11-04', [], '', FORMATS.linkedin);
   const ages = textCalls.filter((c) => /^\d+$/.test(c.text));
-  assert.deepEqual(ages.map((c) => c.text), ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90']);
+  assert.deepEqual(ages.map((c) => c.text), ['0', '10', '20', '30', '40', '50', '60', '70', '80']);
   for (const c of ages) {
     assert.equal(c.y, layout.ages.y);
     assert.equal(c.x, cellBox(layout.grid, Number(c.text) * WEEKS_PER_YEAR).x);
