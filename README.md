@@ -9,7 +9,7 @@ Inspired by Tim Urban's [Your Life in Weeks](https://waitbutwhy.com/2014/05/life
 Life in Weeks is a static web page. There is no server, no database and no account.
 
 - Everything runs in your browser.
-- Your birthday, your chapters, your important weeks and your theme are saved in your browser's `localStorage` under the key `liw:v1`. They never leave your device unless you download a backup.
+- Your birthday, your chapters, your important weeks, your theme and whether the grid is fitted to the screen are saved in your browser's `localStorage` under the key `liw:v1`. They never leave your device unless you download a backup.
 - A different browser or device starts fresh. Clearing this site's data in your browser deletes everything. Some browsers clear it for you: Safari deletes a site's saved data after seven days of use without a visit.
 - So Settings → **Backup** can download everything as a JSON file, and restore it in any browser, on any device. The file goes from your browser to you and back; nothing is uploaded. See [Backups](#backups).
 - The share pictures (Settings → **Share your weeks**) are drawn in your browser too. Nothing is uploaded; you save or share the picture yourself.
@@ -30,7 +30,7 @@ That runs `python3 -m http.server 8000 --directory site`. Then open http://local
 
 ## Tests
 
-The date math (including where chapters fall), the Settings rules, the share pictures' layout and drawing, the storage layer, the backup files and the link-preview tags have unit tests that use Node's built-in test runner (Node 20 or later):
+The date math (including where chapters fall), the Settings rules, the Fit to screen sizing, the share pictures' layout and drawing, the storage layer, the backup files and the link-preview tags have unit tests that use Node's built-in test runner (Node 20 or later):
 
 ```bash
 npm test
@@ -58,6 +58,7 @@ site/            the whole app, served as-is
   fonts/         Geist and Geist Mono (woff2), with their license in OFL.txt
   js/app.js      rendering and events for the Weeks and Settings screens
   js/weeks.js    pure date math for the grid, including where chapters fall (no DOM)
+  js/fit.js      Fit to screen: how big the squares can be for the whole grid to fit in the window (no DOM)
   js/colors.js   the colors a chapter or important week can have (their shades are in styles.css)
   js/settings.js pure rules for Settings: checking dates, adding and removing chapters and important weeks
   js/picture.js  the share pictures: their formats, layout and canvas drawing (no DOM)
@@ -81,7 +82,7 @@ The figures are the World Health Organization's life expectancy at birth ([Globa
 
 Both screens are on one page; the address picks which one shows, so the browser's back button and reload work as expected.
 
-- **Weeks** (`#weeks`, the default): the grid, as long as your life span. Weeks beyond the span show only where something is saved there, or if you have outlived it, as faded outlines labelled "Past your span"; nothing saved is ever dropped. Chapters color their stretch of weeks, and a line under the legend names each one. Important weeks show in the color you picked for them, over any chapter. Hover a chapter's week or an important week for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. Inside the ring it keeps its own color: lived, its chapters' or an important week's. Before a birthday is saved, it asks you to add one, or to restore a backup (the way in on a new device, or after the browser cleared the site).
+- **Weeks** (`#weeks`, the default): the grid, as long as your life span. Weeks beyond the span show only where something is saved there, or if you have outlived it, as faded outlines labelled "Past your span"; nothing saved is ever dropped. Chapters color their stretch of weeks, and a line under the legend names each one. Important weeks show in the color you picked for them, over any chapter. Hover a chapter's week or an important week for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. Inside the ring it keeps its own color: lived, its chapters' or an important week's. **Fit to screen**, next to the heading, shrinks the squares until every year fits in the window, so your whole life shows without scrolling; on a window at least as wide as it is tall, the heading moves beside the grid to leave it more height. It follows the window as it is resized, and is remembered in this browser but not put in backups, since it is about the screen rather than you. Before a birthday is saved, it asks you to add one, or to restore a backup (the way in on a new device, or after the browser cleared the site).
 - **Settings** (`#settings`): your birthday, your life span (below), the light or dark theme, your chapters (add when one began, when it ended or nothing if it's still going, a name and a color, or remove one), and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
   - **Share your weeks** makes a PNG of your whole grid in your current theme, sized for where you'll post it. Save it, or, where the browser supports sharing files (most phones), share it straight to the app. It needs a birthday first.
   - **Backup** downloads everything as a file, or restores one. See below.
@@ -112,7 +113,7 @@ To add a format, add an entry to `FORMATS` in `js/picture.js` (its size, margins
 
 ### Backups
 
-**Download backup** saves `life-in-weeks-backup-YYYY-MM-DD.json`: your birthday, theme, chapters and important weeks, as readable JSON.
+**Download backup** saves `life-in-weeks-backup-YYYY-MM-DD.json`: your birthday, theme, chapters and important weeks, as readable JSON. Fit to screen is left out: restoring a backup keeps this screen's setting.
 
 ```json
 {

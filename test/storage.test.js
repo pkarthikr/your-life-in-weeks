@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { STORAGE_KEY, load, save, clean, askToKeep } from '../site/js/storage.js';
 
-const EMPTY = { birthday: '', events: [], chapters: [], theme: 'dark', lifespan: { country: '', sex: 'both', custom: null } };
+const EMPTY = { birthday: '', events: [], chapters: [], theme: 'dark', lifespan: { country: '', sex: 'both', custom: null }, fit: false };
 
 function memoryStore(initial = {}) {
   const items = { ...initial };
@@ -61,7 +61,7 @@ test('load keeps each important week\'s color and defaults the rest to blue', ()
 test('save merges into what is stored and round-trips', () => {
   const store = memoryStore({ [STORAGE_KEY]: JSON.stringify({ theme: 'light', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }] }) });
   const next = save({ birthday: '1990-01-01' }, store);
-  assert.deepEqual(next, { birthday: '1990-01-01', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }], chapters: [], theme: 'light', lifespan: EMPTY.lifespan });
+  assert.deepEqual(next, { birthday: '1990-01-01', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }], chapters: [], theme: 'light', lifespan: EMPTY.lifespan, fit: false });
   assert.deepEqual(load(store), next);
 });
 
@@ -92,10 +92,10 @@ test('load keeps well-formed chapters, with an id each, and an empty end for one
 test('chapters and important weeks are saved side by side, and data saved before chapters still loads', () => {
   const before = { birthday: '1990-01-01', events: [{ id: 1, date: '2010-05-01', label: 'Graduated', color: 'green' }], theme: 'light' };
   const store = memoryStore({ [STORAGE_KEY]: JSON.stringify(before) });
-  assert.deepEqual(load(store), { ...before, chapters: [], lifespan: EMPTY.lifespan });
+  assert.deepEqual(load(store), { ...before, chapters: [], lifespan: EMPTY.lifespan, fit: false });
   const chapter = { id: 1, start: '2008-08-25', end: '', label: 'College', color: 'violet' };
   save({ chapters: [chapter] }, store);
-  assert.deepEqual(load(store), { ...before, chapters: [chapter], lifespan: EMPTY.lifespan });
+  assert.deepEqual(load(store), { ...before, chapters: [chapter], lifespan: EMPTY.lifespan, fit: false });
 });
 
 test('clean makes the saved shape from anything', () => {
@@ -109,7 +109,16 @@ test('clean makes the saved shape from anything', () => {
     chapters: [{ id: 1, start: '2008-08-25', end: '', label: 'College', color: 'blue' }],
     theme: 'light',
     lifespan: EMPTY.lifespan,
+    fit: false,
   });
+});
+
+test('Fit to screen is saved, and only true turns it on', () => {
+  const store = memoryStore();
+  assert.equal(save({ fit: true }, store).fit, true);
+  assert.equal(load(store).fit, true);
+  assert.equal(save({ fit: false }, store).fit, false);
+  for (const odd of ['true', 1, {}, null]) assert.equal(clean({ fit: odd }).fit, false, JSON.stringify(odd));
 });
 
 test('the life span is saved, and anything unusable in it is dropped', () => {

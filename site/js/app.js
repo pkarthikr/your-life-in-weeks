@@ -1,7 +1,8 @@
 // Life in Weeks — the Weeks and Settings screens.
 //
-// Runs entirely in the browser. The birthday, chapters, important weeks and
-// theme are read from (and written to) localStorage only; see storage.js.
+// Runs entirely in the browser. The birthday, chapters, important weeks,
+// theme and Fit to screen are read from (and written to) localStorage only;
+// see storage.js.
 // Nothing is sent anywhere. A backup file (backup.js) is the only way they
 // leave the browser, and only when the person downloads one.
 //
@@ -55,6 +56,7 @@ import {
 import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
 import { FORMATS, PICTURE_FONTS, drawPicture, pictureColors, pictureText, siteAddress } from './picture.js';
 import { hasData, backupFile, sizeError, readBackup, summary, exportedOn } from './backup.js';
+import { fitCells } from './fit.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -129,6 +131,7 @@ function render() {
 
   if (screen === 'settings') renderSettings(hasBirthday ? birth : null, today);
   else if (hasBirthday) renderWeeks(birth, today);
+  fitGrid();
 }
 
 /** The calendar the add forms check dates against (see calendarYears), for the saved birthday. */
@@ -341,6 +344,62 @@ function eventItem(event, birth) {
 function chapterItem(chapter, birth, today) {
   return listItem({ ...chapter, meta: describeChapter(birth, chapter, today) });
 }
+
+// ---- Fit to screen ------------------------------------------------------------
+//
+// Normally the grid fills the page's width, which makes it taller than any
+// screen. Fit to screen shrinks the squares until every year fits in the
+// window below the grid's top (js/fit.js). It is remembered in this browser,
+// but not put in backups: it is about this screen, not about you.
+
+function fitGrid() {
+  const view = $('weeks-view');
+  const on = data.fit && !view.hidden;
+  $('fit-toggle').setAttribute('aria-pressed', String(data.fit));
+  document.body.classList.toggle('fit', on);
+  if (!on) return;
+
+  // Measured with the fitted layout in place (the heading may now be beside
+  // the grid), but before the squares change: nothing above them depends on
+  // their size.
+  const grid = view.querySelector('.grid');
+  const rows = $('rows');
+  const hero = view.querySelector('.hero');
+  const beside = getComputedStyle(view).flexDirection === 'row';
+  const width = view.clientWidth - (beside ? hero.offsetWidth + parseFloat(getComputedStyle(view).columnGap) : 0);
+  const top = rows.getBoundingClientRect().top + window.scrollY;
+  const bottom = parseFloat(getComputedStyle(document.querySelector('.main')).paddingBottom);
+  const height = document.documentElement.clientHeight - top - bottom;
+
+  const { cell, column, row } = fitCells({
+    width,
+    height,
+    rows: rows.querySelectorAll('.row').length,
+    columns: WEEKS_PER_YEAR,
+    dpr: window.devicePixelRatio || 1,
+  });
+  grid.style.setProperty('--cell', `${cell}px`);
+  grid.style.setProperty('--gc', `${column}px`);
+  grid.style.setProperty('--gr', `${row}px`);
+}
+
+$('fit-toggle').addEventListener('click', () => {
+  hidePopover();
+  update({ fit: !data.fit });
+});
+
+// A new window size, zoom level or font changes the room the grid has.
+let fitFrame = 0;
+function refit() {
+  cancelAnimationFrame(fitFrame);
+  fitFrame = requestAnimationFrame(() => {
+    if (!data.fit) return;
+    hidePopover();
+    fitGrid();
+  });
+}
+window.addEventListener('resize', refit);
+document.fonts?.ready.then(refit);
 
 // ---- Week popover ------------------------------------------------------------
 //
@@ -962,7 +1021,8 @@ $('restore-dialog').addEventListener('close', () => {
 });
 
 function restore({ data: restored, exported }) {
-  update(restored);
+  // Fit to screen is about this screen, so a backup leaves it as it is.
+  update({ ...restored, fit: data.fit });
   // A different set of chapters: offer the color they use least.
   pickColor('chapter-color', nextChapterColor(data.chapters));
   const on = exportedOn(exported);

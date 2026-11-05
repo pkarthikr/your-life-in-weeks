@@ -65,6 +65,12 @@
         <h1 class="title" id="weeks-title" tabindex="-1">Every square is a week.</h1>
         <p class="sub">Born <span id="born"></span>. You are in week <span id="week"></span> of year <span id="age"></span>.</p>
       </div>
+      <!-- Shrinks the squares so every year fits in the window (js/fit.js). -->
+      <button type="button" class="btn btn-2 fit-toggle" id="fit-toggle" aria-pressed="false">
+        <svg class="fit-out" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>
+        <svg class="fit-in" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5"/></svg>
+        Fit to screen
+      </button>
     </header>
 
     <section class="grid" aria-label="Week grid">
