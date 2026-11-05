@@ -28,6 +28,7 @@ const DATA = Object.freeze({
     { id: 1, date: '2008-09-01', label: 'Started university', color: 'violet' },
     { id: 4, date: '2015-03-02', label: 'Moved to “Seattle” — 🌧', color: 'teal' },
   ],
+  fit: false,
 });
 
 /** A backup file's text with these fields on top of a real one. */
@@ -57,6 +58,12 @@ test('a backup is named for the day it was made and holds everything that is sav
     events: DATA.events,
   });
   assert.ok(text.includes('\n  "birthday"'), 'indented, so it is readable');
+});
+
+test('Fit to screen is about the screen, so it is not put in a backup', () => {
+  const { text } = backupFile({ ...DATA, fit: true }, today);
+  assert.equal('fit' in JSON.parse(text), false);
+  assert.equal(readBackup(backupWith({ fit: true })).data.fit, false);
 });
 
 test('a backup restores exactly what was backed up', () => {

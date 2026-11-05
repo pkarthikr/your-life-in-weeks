@@ -84,7 +84,8 @@ export function readBackup(text) {
     return { error: 'The birthday in this backup isn’t a valid date.' };
   }
 
-  const data = clean({ ...body, birthday: birth ? toISODate(birth) : '' });
+  // Fit to screen is about a screen, not a person, so it never comes from a backup.
+  const data = clean({ ...body, birthday: birth ? toISODate(birth) : '', fit: false });
   if (!hasData(data)) return { error: 'This backup is empty: it has no birthday, chapters or important weeks.' };
   return { data, exported: parseISODate(body.exported) ? body.exported : '' };
 }

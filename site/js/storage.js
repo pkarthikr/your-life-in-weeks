@@ -8,7 +8,7 @@ import { DEFAULT_LIFESPAN, cleanLifespan } from './lifespan.js';
 
 export const STORAGE_KEY = 'liw:v1';
 
-const DEFAULTS = Object.freeze({ birthday: '', events: [], chapters: [], theme: 'dark', lifespan: DEFAULT_LIFESPAN });
+const DEFAULTS = Object.freeze({ birthday: '', events: [], chapters: [], theme: 'dark', lifespan: DEFAULT_LIFESPAN, fit: false });
 
 function defaultStore() {
   try {
@@ -67,6 +67,7 @@ const cleanChapters = (list) =>
  *   chapters: [{ id, start, end, label, color }],
  *   theme: 'dark' | 'light',
  *   lifespan: { country, sex, custom },  // see lifespan.js
+ *   fit: boolean,  // Fit to screen on the Weeks page; not put in backups
  * }
  * Dates are 'YYYY-MM-DD'. A chapter's `end` is '' while it is still going.
  * `color` is one of the ids in colors.js.
@@ -79,6 +80,7 @@ export function clean(saved) {
     chapters: cleanChapters(saved.chapters),
     theme: saved.theme === 'light' ? 'light' : DEFAULTS.theme,
     lifespan: cleanLifespan(saved.lifespan),
+    fit: saved.fit === true,
   };
 }
 
