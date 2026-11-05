@@ -1,9 +1,11 @@
-// The colors an important week can wear. Pure data — no DOM, no storage.
+// The colors a chapter or an important week can wear. Pure data — no DOM,
+// no storage.
 //
-// Only the id is saved with each important week. The actual shades live in
-// styles.css as `--c-<id>`, once per theme, and the `.c-<id>` class points
-// `--mark` at them. Each shade was picked to stay clear of the "this week"
-// color and of the lived and ahead squares in both themes.
+// Only the id is saved with each chapter or important week. The actual
+// shades live in styles.css as `--c-<id>`, once per theme, and the
+// `.c-<id>` class points `--mark` at them. Each shade was picked to stay
+// clear of the "this week" color and of the lived and ahead squares in
+// both themes.
 
 export const COLORS = Object.freeze([
   { id: 'blue', name: 'Blue' },

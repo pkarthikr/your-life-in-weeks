@@ -15,6 +15,12 @@ import {
   eventsByWeek,
   sortEvents,
   cellState,
+  weekIndex,
+  sortChapters,
+  chapterSpan,
+  chaptersByWeek,
+  describeChapter,
+  CHAPTERS_PER_WEEK,
 } from '../site/js/weeks.js';
 
 const d = (s) => parseISODate(s);
@@ -148,4 +154,110 @@ test('cellState', () => {
   assert.equal(cellState(3, 3, events), 'now');
   assert.equal(cellState(4, 3, events), 'ahead');
   assert.equal(cellState(5, 3, events), 'event');
+});
+
+// ---- Chapters -----------------------------------------------------------------
+
+const born = d('1990-06-15');
+const today = d('2026-11-05');
+const at = (date) => weekIndex(born, d(date));
+const ch = (id, start, end, label = `#${id}`, color = 'blue') => ({ id, start, end, label, color });
+
+test('weekIndex is the grid index of a date, or null before the birthday', () => {
+  assert.equal(weekIndex(born, born), 0);
+  assert.equal(weekIndex(born, d('1990-06-22')), 1);
+  assert.equal(weekIndex(born, d('1991-06-15')), WEEKS_PER_YEAR);
+  assert.equal(weekIndex(born, d('1990-06-14')), null);
+});
+
+test('chapterSpan covers the weeks from start to end, both included', () => {
+  assert.deepEqual(chapterSpan(born, ch(1, '2008-08-25', '2012-05-15'), today), { first: at('2008-08-25'), last: at('2012-05-15') });
+  // A chapter inside a single week.
+  assert.deepEqual(chapterSpan(born, ch(1, '1990-06-16', '1990-06-18'), today), { first: 0, last: 0 });
+  // One that ends in the future.
+  assert.deepEqual(chapterSpan(born, ch(1, '2027-09-01', '2029-06-30'), today), { first: at('2027-09-01'), last: at('2029-06-30') });
+});
+
+test('chapterSpan: a chapter still going runs up to this week', () => {
+  const span = chapterSpan(born, ch(1, '2019-09-01', ''), today);
+  assert.equal(span.last, lifeStats(born, today).nowIndex);
+  // It can't have begun after today.
+  assert.equal(chapterSpan(born, ch(1, '2027-01-01', ''), today), null);
+});
+
+test('chapterSpan cuts off what is not on the grid', () => {
+  // Begins before the birthday (the birthday was changed after it was added).
+  assert.deepEqual(chapterSpan(born, ch(1, '1985-01-01', '1991-01-01'), today), { first: 0, last: at('1991-01-01') });
+  assert.equal(chapterSpan(born, ch(1, '1985-01-01', '1989-01-01'), today), null);
+  // Runs past the end of the grid, or begins after it.
+  assert.deepEqual(chapterSpan(born, ch(1, '2080-01-01', '2095-01-01'), today), { first: at('2080-01-01'), last: YEARS * WEEKS_PER_YEAR - 1 });
+  assert.equal(chapterSpan(born, ch(1, '2091-01-01', '2095-01-01'), today), null);
+  // Someone older than the grid with a chapter still going.
+  const old = d('1920-01-01');
+  assert.deepEqual(chapterSpan(old, ch(1, '2015-01-01', ''), today).last, YEARS * WEEKS_PER_YEAR - 1);
+});
+
+test('chapterSpan is null for a chapter it cannot place', () => {
+  assert.equal(chapterSpan(null, ch(1, '2008-08-25', '2012-05-15'), today), null);
+  assert.equal(chapterSpan(born, ch(1, 'garbage', '2012-05-15'), today), null);
+  assert.equal(chapterSpan(born, ch(1, '2008-08-25', '2012-02-30'), today), null);
+  assert.equal(chapterSpan(born, ch(1, '2012-05-15', '2008-08-25'), today), null);
+});
+
+test('sortChapters orders by start, then end, with one still going last, and copies', () => {
+  const chapters = [ch(1, '2012-06-01', ''), ch(2, '2008-08-25', '2012-05-15'), ch(3, '2012-06-01', '2017-03-31'), ch(4, '2008-08-25', '2012-05-15')];
+  assert.deepEqual(sortChapters(chapters).map((c) => c.id), [2, 4, 3, 1]);
+  assert.deepEqual(chapters.map((c) => c.id), [1, 2, 3, 4]);
+});
+
+test('chaptersByWeek lists the chapters of each week', () => {
+  const college = ch(1, '2008-08-25', '2012-05-15');
+  const map = chaptersByWeek(born, [college], today);
+  assert.equal(map.size, at('2012-05-15') - at('2008-08-25') + 1);
+  assert.deepEqual(map.get(at('2010-01-01')), [college]);
+  assert.equal(map.has(at('2008-08-24') - 1), false);
+});
+
+test('chaptersByWeek: overlapping chapters keep a lane each, for all their weeks', () => {
+  const seattle = ch(1, '2012-06-01', '2019-08-31', 'Seattle');
+  const acme = ch(2, '2012-07-02', '2017-03-31', 'Acme');
+  const sam = ch(3, '2014-02-14', '', 'Sam');
+  const london = ch(4, '2019-09-02', '', 'London');
+  // Listed in any order; lanes follow the dates.
+  const map = chaptersByWeek(born, [sam, london, acme, seattle], today);
+  const labels = (date) => map.get(at(date)).map((c) => c.label);
+  assert.deepEqual(labels('2012-06-10'), ['Seattle']);
+  assert.deepEqual(labels('2013-01-01'), ['Seattle', 'Acme']); // Acme began inside Seattle: the lane after it
+  assert.deepEqual(labels('2015-01-01'), ['Seattle', 'Acme', 'Sam']);
+  assert.deepEqual(labels('2018-01-01'), ['Seattle', 'Sam']); // Sam keeps its lane after Acme ends
+  // London starts once Seattle has ended and takes the lane Acme left; Sam still comes after it.
+  assert.deepEqual(labels('2020-01-01'), ['London', 'Sam']);
+});
+
+test('chaptersByWeek: a chapter that begins with another, and is shorter, goes in the lane after it', () => {
+  const short = ch(1, '2010-01-01', '2010-06-01', 'Short');
+  const long = ch(2, '2010-01-01', '2015-01-01', 'Long');
+  const map = chaptersByWeek(born, [short, long], today);
+  assert.deepEqual(map.get(at('2010-02-01')).map((c) => c.label), ['Long', 'Short']);
+  // Same dates: the one added first comes first.
+  const twin = ch(3, '2010-01-01', '2015-01-01', 'Twin');
+  assert.deepEqual(chaptersByWeek(born, [long, twin], today).get(at('2012-01-01')).map((c) => c.label), ['Long', 'Twin']);
+});
+
+test('chaptersByWeek leaves out chapters that are not on the grid', () => {
+  const map = chaptersByWeek(born, [ch(1, '1980-01-01', '1985-01-01'), ch(2, 'bad', '')], today);
+  assert.equal(map.size, 0);
+});
+
+test('a week shows at most three chapters', () => {
+  assert.equal(CHAPTERS_PER_WEEK, 3);
+});
+
+test('describeChapter gives the dates and the weeks the chapter covers', () => {
+  assert.equal(describeChapter(born, ch(1, '2008-08-25', '2012-05-15'), today), 'Aug 25, 2008 – May 15, 2012 · 194 weeks');
+  assert.equal(describeChapter(born, ch(1, '2026-11-02', ''), today), 'Nov 2, 2026 – now · 1 week');
+  assert.equal(describeChapter(born, ch(1, '2027-09-01', '2029-06-30'), today), 'Sep 1, 2027 – Jun 30, 2029 · 96 weeks');
+  // No birthday, or nothing on the grid: just the dates.
+  assert.equal(describeChapter(null, ch(1, '2008-08-25', ''), today), 'Aug 25, 2008 – now');
+  assert.equal(describeChapter(born, ch(1, '1980-01-01', '1985-01-01'), today), 'Jan 1, 1980 – Jan 1, 1985');
 });

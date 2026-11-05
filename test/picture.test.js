@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, parseISODate, lifeStats, eventsByWeek } from '../site/js/weeks.js';
-import { FORMATS, PREVIEW, pictureLayout, cellBox, pictureText, pictureColors, siteAddress, drawPicture } from '../site/js/picture.js';
+import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, parseISODate, lifeStats, eventsByWeek, chaptersByWeek, weekIndex } from '../site/js/weeks.js';
+import { FORMATS, PREVIEW, pictureLayout, cellBox, stripeBox, pictureText, pictureColors, siteAddress, drawPicture } from '../site/js/picture.js';
 import { COLORS as PALETTE } from '../site/js/colors.js';
 
 const d = (s) => parseISODate(s);
@@ -127,9 +127,9 @@ test('pictureText says "week" for one', () => {
   assert.equal(pictureText({ lived: 0, ahead: 5199 }).lived, '0 weeks lived.');
 });
 
-test('pictureColors reads each theme token, the important-week shades and the halo', () => {
+test('pictureColors reads each theme token, the color shades, the halo and the tint', () => {
   const tokens = {
-    bg: '#000', text: '#fff', ink: '#eee', muted: '#999', future: '#222', now: '#fb4', nowA: 'rgba(1,2,3,.5)', halo: '25%',
+    bg: '#000', text: '#fff', ink: '#eee', muted: '#999', future: '#222', now: '#fb4', nowA: 'rgba(1,2,3,.5)', halo: '25%', tint: '40%',
     ...Object.fromEntries(PALETTE.map((c) => [`c-${c.id}`, `#${c.id}`])),
   };
   const colors = pictureColors((name) => tokens[name] ?? '');
@@ -137,8 +137,10 @@ test('pictureColors reads each theme token, the important-week shades and the ha
     bg: '#000', text: '#fff', ink: '#eee', muted: '#999', future: '#222', now: '#fb4', nowA: 'rgba(1,2,3,.5)',
     marks: Object.fromEntries(PALETTE.map((c) => [c.id, `#${c.id}`])),
     halo: 0.25,
+    tint: 0.4,
   });
   assert.equal(pictureColors(() => '').halo, 0.3, 'a missing halo falls back to 30%');
+  assert.equal(pictureColors(() => '').tint, 0.35, 'a missing tint falls back to 35%');
 });
 
 test('siteAddress is the page address without the protocol, file or hash', () => {
@@ -179,12 +181,20 @@ const COLORS = {
   bg: 'BG', text: 'TEXT', ink: 'INK', muted: 'MUTED', future: 'FUTURE', now: 'NOW', nowA: 'NOWA',
   marks: Object.fromEntries(PALETTE.map((c) => [c.id, c.id.toUpperCase()])),
   halo: 0.3,
+  tint: 0.35,
 };
 
-function draw(birthday, today, events = [], site = 'example.github.io/weeks', format = FORMATS.story) {
+function draw(birthday, today, events = [], site = 'example.github.io/weeks', format = FORMATS.story, chapters = []) {
   const born = d(birthday);
   const ctx = fakeContext();
-  drawPicture(ctx, { format, stats: lifeStats(born, d(today)), events: eventsByWeek(born, events), colors: COLORS, site });
+  drawPicture(ctx, {
+    format,
+    stats: lifeStats(born, d(today)),
+    events: eventsByWeek(born, events),
+    chapters: chaptersByWeek(born, chapters, d(today)),
+    colors: COLORS,
+    site,
+  });
   // Only what is filled on the grid; the legend and brand mark reuse its colours.
   const layout = pictureLayout(format, { footer: Boolean(site) });
   const { grid } = layout;
@@ -346,4 +356,121 @@ test('drawPicture rings the week you were born and keeps its own color inside', 
     // Its halo, if it has one, is left off: the ring takes its place.
     assert.equal(filled(inside, 0.3).length, 0);
   }
+});
+
+// ---- Chapters on the picture ---------------------------------------------------
+
+test('stripeBox: one chapter fills the week', () => {
+  for (const format of ALL) {
+    const { grid } = pictureLayout(format);
+    const radius = Math.max(1, Math.round(grid.cellH / 5));
+    assert.deepEqual(stripeBox(grid, 200, 0, 1), { ...cellBox(grid, 200), radii: radius });
+  }
+});
+
+test('stripeBox: on a grid of rows, stripes stack top to bottom and fill the week exactly', () => {
+  const { grid } = pictureLayout(FORMATS.story);
+  const week = cellBox(grid, 300);
+  for (const n of [2, 3]) {
+    const stripes = Array.from({ length: n }, (_, k) => stripeBox(grid, 300, k, n));
+    assert.equal(stripes[0].y, week.y);
+    assert.equal(stripes.at(-1).y + stripes.at(-1).h, week.y + week.h);
+    for (let k = 1; k < n; k++) assert.equal(stripes[k].y, stripes[k - 1].y + stripes[k - 1].h, 'no gap, no overlap');
+    for (const s of stripes) assert.deepEqual([s.x, s.w], [week.x, week.w]);
+    const r = Math.max(1, Math.round(grid.cellH / 5));
+    assert.deepEqual(stripes[0].radii, [r, r, 0, 0], 'top corners');
+    assert.deepEqual(stripes.at(-1).radii, [0, 0, r, r], 'bottom corners');
+    if (n === 3) assert.deepEqual(stripes[1].radii, [0, 0, 0, 0]);
+  }
+});
+
+test('stripeBox: on a grid of columns, stripes sit side by side, so they run down the year as time does', () => {
+  const { grid } = pictureLayout(FORMATS.x);
+  const week = cellBox(grid, 300);
+  const [a, b] = [stripeBox(grid, 300, 0, 2), stripeBox(grid, 300, 1, 2)];
+  assert.deepEqual([a.y, a.h, b.y, b.h], [week.y, week.h, week.y, week.h]);
+  assert.equal(a.x, week.x);
+  assert.equal(b.x, a.x + a.w);
+  assert.equal(b.x + b.w, week.x + week.w);
+  const r = Math.max(1, Math.round(grid.cellH / 5));
+  assert.deepEqual(a.radii, [r, 0, 0, r], 'left corners');
+  assert.deepEqual(b.radii, [0, r, r, 0], 'right corners');
+});
+
+const LIFE = [
+  { id: 1, start: '2008-08-25', end: '2012-05-15', label: 'College', color: 'green' },
+  { id: 2, start: '2012-06-01', end: '', label: 'Seattle', color: 'violet' },
+  { id: 3, start: '2014-02-14', end: '2016-02-14', label: 'Acme', color: 'teal' },
+  { id: 4, start: '2027-09-01', end: '2029-06-30', label: 'Sabbatical', color: 'red' },
+];
+const born1990 = d('1990-01-01');
+const at = (date) => weekIndex(born1990, d(date));
+const weeksOf = (start, end) => at(end) - at(start) + 1;
+
+for (const format of ALL) {
+  test(`${format.id}: drawPicture paints lived weeks in their chapters' colors, and tints weeks ahead`, () => {
+    const { filled } = draw('1990-01-01', '2026-11-04', [], 'example.github.io/weeks', format, LIFE);
+    const nowIndex = lifeStats(born1990, d('2026-11-04')).nowIndex;
+    const college = weeksOf('2008-08-25', '2012-05-15');
+    const seattle = nowIndex - at('2012-06-01'); // up to, not including, this week
+    const acme = weeksOf('2014-02-14', '2016-02-14');
+    const sabbatical = weeksOf('2027-09-01', '2029-06-30');
+    assert.equal(filled('GREEN').length, college);
+    assert.equal(filled('VIOLET').length, seattle, 'one stripe a week, with Acme or without');
+    assert.equal(filled('TEAL').length, acme);
+    // Lived weeks outside chapters stay ink; this week stays this week.
+    assert.equal(filled('INK').length, nowIndex - 1 - college - seattle);
+    assert.equal(filled('NOW').length, 1);
+    // Weeks ahead keep the ahead color, with the chapter's shade over them at the tint.
+    assert.equal(filled('FUTURE').length, YEARS * WEEKS_PER_YEAR - nowIndex - 1);
+    assert.equal(filled('RED', 0.35).length, sabbatical);
+    assert.equal(filled('RED').length, 0);
+  });
+}
+
+test('drawPicture splits a week in two chapters into a stripe of each, in lane order', () => {
+  const { ctx, layout } = draw('1990-01-01', '2026-11-04', [], 'example.github.io/weeks', FORMATS.story, LIFE);
+  const week = at('2015-01-05');
+  const stripes = ctx.calls
+    .filter((c) => c.op === 'fill')
+    .flatMap((c) => c.rects.filter(([x, y, w, h]) => {
+      const box = cellBox(layout.grid, week);
+      return x === box.x && y >= box.y && y + h <= box.y + box.h;
+    }).map(([, y]) => ({ color: c.color, y })));
+  assert.deepEqual(stripes.sort((a, z) => a.y - z.y).map((s) => s.color), ['VIOLET', 'TEAL'], 'Seattle on top, Acme below');
+});
+
+test('drawPicture draws an important week over its chapter, with a gap of background around it', () => {
+  const events = [{ id: 1, date: '2010-03-01', label: 'Graduated', color: 'green' }];
+  const { filled, layout } = draw('1990-01-01', '2026-11-04', events, 'example.github.io/weeks', FORMATS.story, LIFE);
+  assert.equal(filled('GREEN').length, weeksOf('2008-08-25', '2012-05-15'), 'the important week replaces its chapter week');
+  const box = cellBox(layout.grid, at('2010-03-01'));
+  const centred = (r) => r[0] + r[2] / 2 === box.x + box.w / 2 && r[1] + r[3] / 2 === box.y + box.h / 2;
+  const gap = filled('BG').filter(centred);
+  const week = filled('GREEN').filter(centred);
+  assert.equal(gap.length, 1);
+  assert.ok(gap[0][2] > week[0][2], 'the gap is around the week');
+});
+
+test('drawPicture shows each chapter color once in the legend, in palette order, and no chapter names', () => {
+  const { legend, texts } = draw('1990-01-01', '2026-11-04', [{ id: 1, date: '2015-03-02', label: 'Married', color: 'pink' }], 'example.github.io/weeks', FORMATS.story, LIFE);
+  // Lived, ahead, this week, born (ring, gap, swatch), then chapters, then important weeks.
+  assert.deepEqual(legend, ['INK', 'FUTURE', 'NOW', 'NOW', 'BG', 'INK', 'VIOLET', 'RED', 'GREEN', 'TEAL', 'PINK']);
+  assert.ok(texts.includes('Chapter'));
+  for (const { label } of LIFE) assert.ok(!texts.some((t) => t.includes(label)), `${label} stays private`);
+  assert.ok(!draw('1990-01-01', '2026-11-04').texts.includes('Chapter'), 'no chapters, no legend entry');
+});
+
+test('drawPicture rings the week you were born and shows its chapters inside', () => {
+  const childhood = [
+    { id: 1, start: '1990-01-01', end: '2008-06-01', label: 'Childhood', color: 'teal' },
+    { id: 2, start: '1990-01-01', end: '1990-03-01', label: 'Hospital', color: 'red' },
+  ];
+  const { ctx, layout } = draw('1990-01-01', '2026-11-04', [], 'example.github.io/weeks', FORMATS.story, childhood);
+  const first = cellBox(layout.grid, BIRTH_WEEK);
+  const inFirst = ctx.calls
+    .filter((c) => c.op === 'fill')
+    .flatMap((c) => c.rects.filter(([x, y, w, h]) => x <= first.x && y <= first.y + first.h && x + w >= first.x + first.w && y + h >= first.y).map(() => c.color));
+  // The ring, the gap inside it, then a stripe of each chapter.
+  assert.deepEqual(inFirst.slice(-4), ['NOW', 'BG', 'TEAL', 'RED']);
 });

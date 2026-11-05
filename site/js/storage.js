@@ -7,7 +7,7 @@ import { colorOrDefault } from './colors.js';
 
 export const STORAGE_KEY = 'liw:v1';
 
-const DEFAULTS = Object.freeze({ birthday: '', events: [], theme: 'dark' });
+const DEFAULTS = Object.freeze({ birthday: '', events: [], chapters: [], theme: 'dark' });
 
 function defaultStore() {
   try {
@@ -21,27 +21,52 @@ function defaultStore() {
 const isId = (id) => Number.isSafeInteger(id) && id > 0;
 
 /**
- * Keep the well-formed important weeks and make sure each has its own
- * positive integer id, so any one of them can be removed. A missing or
- * unknown color (weeks saved before colors existed) becomes the default.
+ * Keep the well-formed items of a saved list, each reshaped by `shape`, and
+ * make sure each has its own positive integer id, so any one of them can
+ * be removed. `keep` says whether an item is well-formed.
  */
-function cleanEvents(list) {
+function cleanList(list, keep, shape) {
   if (!Array.isArray(list)) return [];
-  const valid = list.filter((e) => e && typeof e.date === 'string' && typeof e.label === 'string');
-  let next = valid.reduce((max, e) => (isId(e.id) ? Math.max(max, e.id) : max), 0) + 1;
+  const valid = list.filter((item) => item && typeof item === 'object' && keep(item));
+  let next = valid.reduce((max, item) => (isId(item.id) ? Math.max(max, item.id) : max), 0) + 1;
   const seen = new Set();
-  return valid.map((e) => {
-    const id = isId(e.id) && !seen.has(e.id) ? e.id : next++;
+  return valid.map((item) => {
+    const id = isId(item.id) && !seen.has(item.id) ? item.id : next++;
     seen.add(id);
-    return { id, date: e.date, label: e.label, color: colorOrDefault(e.color) };
+    return { id, ...shape(item) };
   });
 }
+
+/**
+ * Important weeks. A missing or unknown color (weeks saved before colors
+ * existed) becomes the default.
+ */
+const cleanEvents = (list) =>
+  cleanList(
+    list,
+    (e) => typeof e.date === 'string' && typeof e.label === 'string',
+    (e) => ({ date: e.date, label: e.label, color: colorOrDefault(e.color) }),
+  );
+
+/** Chapters. A missing end means the chapter is still going. */
+const cleanChapters = (list) =>
+  cleanList(
+    list,
+    (c) => typeof c.start === 'string' && typeof c.label === 'string',
+    (c) => ({ start: c.start, end: typeof c.end === 'string' ? c.end : '', label: c.label, color: colorOrDefault(c.color) }),
+  );
 
 /**
  * The saved shape, made from whatever `saved` holds: what was in storage, or
  * a backup file (see backup.js). Always complete and well-formed.
  *
- * Shape: { birthday: 'YYYY-MM-DD' | '', events: [{ id, date, label, color }], theme: 'dark' | 'light' }
+ * Shape: {
+ *   birthday: 'YYYY-MM-DD' | '',
+ *   events: [{ id, date, label, color }],
+ *   chapters: [{ id, start, end, label, color }],
+ *   theme: 'dark' | 'light',
+ * }
+ * Dates are 'YYYY-MM-DD'. A chapter's `end` is '' while it is still going.
  * `color` is one of the ids in colors.js.
  */
 export function clean(saved) {
@@ -49,6 +74,7 @@ export function clean(saved) {
   return {
     birthday: typeof saved.birthday === 'string' ? saved.birthday : DEFAULTS.birthday,
     events: cleanEvents(saved.events),
+    chapters: cleanChapters(saved.chapters),
     theme: saved.theme === 'light' ? 'light' : DEFAULTS.theme,
   };
 }

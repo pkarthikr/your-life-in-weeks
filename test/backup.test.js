@@ -20,6 +20,9 @@ const today = parseISODate('2026-11-05');
 const DATA = Object.freeze({
   birthday: '1990-06-15',
   theme: 'light',
+  chapters: [
+    { id: 1, start: '2012-06-01', end: '', label: 'Living in Seattle', color: 'violet' },
+  ],
   events: [
     { id: 1, date: '2008-09-01', label: 'Started university', color: 'violet' },
     { id: 4, date: '2015-03-02', label: 'Moved to “Seattle” — 🌧', color: 'teal' },
@@ -48,6 +51,7 @@ test('a backup is named for the day it was made and holds everything that is sav
     exported: '2026-11-05',
     birthday: DATA.birthday,
     theme: DATA.theme,
+    chapters: DATA.chapters,
     events: DATA.events,
   });
   assert.ok(text.includes('\n  "birthday"'), 'indented, so it is readable');
@@ -80,6 +84,7 @@ test('a file that is not one of ours is turned away', () => {
     backupWith({ version: '1' }),
     backupWith({ version: 1.5 }),
     backupWith({ events: { 1: DATA.events[0] } }),
+    backupWith({ chapters: 'Seattle' }),
   ]) {
     assert.deepEqual(readBackup(text), { error: notOurs }, text);
   }
@@ -96,14 +101,17 @@ test('a backup with a broken birthday is turned away', () => {
 });
 
 test('an empty backup is turned away, so it can never wipe what is here', () => {
-  const empty = { error: 'This backup is empty: it has no birthday or important weeks.' };
-  assert.deepEqual(readBackup(backupWith({ birthday: '', events: [] })), empty);
+  const empty = { error: 'This backup is empty: it has no birthday, chapters or important weeks.' };
+  assert.deepEqual(readBackup(backupWith({ birthday: '', chapters: [], events: [] })), empty);
   assert.deepEqual(readBackup(JSON.stringify({ app: BACKUP_APP, version: 1 })), empty);
-  assert.deepEqual(readBackup(backupWith({ birthday: '', events: [{ label: 'no date' }] })), empty);
+  assert.deepEqual(readBackup(backupWith({ birthday: '', chapters: [{ start: 'no label' }], events: [{ label: 'no date' }] })), empty);
 });
 
 test('a backup with only some of it is still restored', () => {
   assert.deepEqual(readBackup(backupWith({ events: undefined })).data, { ...DATA, events: [] });
+  assert.deepEqual(readBackup(backupWith({ chapters: undefined })).data, { ...DATA, chapters: [] });
+  // Only chapters is enough.
+  assert.deepEqual(readBackup(backupWith({ birthday: '', events: [] })).data, { ...DATA, birthday: '', events: [] });
   assert.deepEqual(readBackup(backupWith({ birthday: undefined })).data, { ...DATA, birthday: '' });
   assert.equal(readBackup(backupWith({ theme: undefined })).data.theme, 'dark');
 });
@@ -120,6 +128,25 @@ test('important weeks are cleaned the same way as a normal load', () => {
     { id: 2, date: '2001-01-01', label: 'a', color: 'blue' },
     { id: 3, date: '2002-01-01', label: 'b', color: 'pink' },
     { id: 4, date: '2004-01-01', label: 'c', color: 'blue' },
+  ]);
+});
+
+test('a version 1 backup, from before chapters, restores with none', () => {
+  const v1 = JSON.stringify({ app: BACKUP_APP, version: 1, exported: '2026-11-01', birthday: DATA.birthday, theme: DATA.theme, events: DATA.events });
+  assert.equal(BACKUP_VERSION, 2);
+  assert.deepEqual(readBackup(v1), { data: { ...DATA, chapters: [] }, exported: '2026-11-01' });
+});
+
+test('chapters are cleaned the same way as a normal load', () => {
+  const chapters = [
+    { id: 5, start: '2008-08-25', end: '2012-05-15', label: 'College', color: 'neon' },
+    { id: 5, start: '2012-06-01', label: 'Seattle', color: 'pink' }, // duplicate id, no end
+    { start: 2019, label: 'bad start' },
+    null,
+  ];
+  assert.deepEqual(readBackup(backupWith({ chapters })).data.chapters, [
+    { id: 5, start: '2008-08-25', end: '2012-05-15', label: 'College', color: 'blue' },
+    { id: 6, start: '2012-06-01', end: '', label: 'Seattle', color: 'pink' },
   ]);
 });
 
@@ -146,17 +173,21 @@ test('the largest real backup is well under the size limit', () => {
   assert.equal(readBackup(text).data.events.length, 5200);
 });
 
-test('hasData: a birthday or an important week; a theme alone is not worth a backup', () => {
+test('hasData: a birthday, a chapter or an important week; a theme alone is not worth a backup', () => {
   assert.equal(hasData(DATA), true);
   assert.equal(hasData({ ...DATA, birthday: '' }), true);
   assert.equal(hasData({ ...DATA, events: [] }), true);
+  assert.equal(hasData({ ...DATA, birthday: '', events: [] }), true, 'only chapters');
+  assert.equal(hasData({ birthday: '', events: [], chapters: [], theme: 'light' }), false);
   assert.equal(hasData({ birthday: '', events: [], theme: 'light' }), false);
 });
 
 test('summary says what a backup, or the browser, holds', () => {
-  assert.equal(summary(DATA), 'Born Jun 15, 1990 · 2 important weeks');
-  assert.equal(summary({ ...DATA, events: DATA.events.slice(0, 1) }), 'Born Jun 15, 1990 · 1 important week');
-  assert.equal(summary({ ...DATA, events: [] }), 'Born Jun 15, 1990 · no important weeks');
+  assert.equal(summary(DATA), 'Born Jun 15, 1990 · 1 chapter · 2 important weeks');
+  assert.equal(summary({ ...DATA, chapters: Array(3).fill({}) }), 'Born Jun 15, 1990 · 3 chapters · 2 important weeks');
+  // Chapters only come up when there are some.
+  assert.equal(summary({ ...DATA, chapters: [], events: DATA.events.slice(0, 1) }), 'Born Jun 15, 1990 · 1 important week');
+  assert.equal(summary({ ...DATA, chapters: [], events: [] }), 'Born Jun 15, 1990 · no important weeks');
   assert.equal(summary({ birthday: '', events: Array(1200).fill({}) }), 'No birthday · 1,200 important weeks');
 });
 

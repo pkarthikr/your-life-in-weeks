@@ -13,17 +13,20 @@ import { parseISODate, toISODate, formatDate } from './weeks.js';
 /** Marks a file as one of ours, so a stray JSON file can't be restored by mistake. */
 export const BACKUP_APP = 'life-in-weeks';
 
-/** Bump when the file's shape changes; older versions must still restore. */
-export const BACKUP_VERSION = 1;
+/**
+ * Bump when the file's shape changes; older versions must still restore.
+ * 1: birthday, theme and important weeks. 2: adds chapters.
+ */
+export const BACKUP_VERSION = 2;
 
 /** Far bigger than any real backup (a week for every square, with long labels, is under 1 MB). */
 export const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
 
 const NOT_A_BACKUP = 'That file isn’t a Life in Weeks backup.';
 
-/** Whether `data` holds anything worth keeping: a birthday or an important week. */
+/** Whether `data` holds anything worth keeping: a birthday, a chapter or an important week. */
 export function hasData(data) {
-  return Boolean(data.birthday) || data.events.length > 0;
+  return Boolean(data.birthday) || data.events.length > 0 || data.chapters?.length > 0;
 }
 
 /**
@@ -32,8 +35,8 @@ export function hasData(data) {
  */
 export function backupFile(data, today) {
   const exported = toISODate(today);
-  const { birthday, theme, events } = clean(data);
-  const body = { app: BACKUP_APP, version: BACKUP_VERSION, exported, birthday, theme, events };
+  const { birthday, theme, chapters, events } = clean(data);
+  const body = { app: BACKUP_APP, version: BACKUP_VERSION, exported, birthday, theme, chapters, events };
   return {
     name: `life-in-weeks-backup-${exported}.json`,
     text: `${JSON.stringify(body, null, 2)}\n`,
@@ -53,8 +56,9 @@ export function sizeError(bytes) {
  * was made ('YYYY-MM-DD', or '' if the file doesn't say). Or returns
  * `{ error }`, a sentence saying why it can't be restored.
  *
- * Important weeks go through the same cleaning as a normal load, so one
- * malformed entry is dropped rather than spoiling the rest.
+ * Chapters and important weeks go through the same cleaning as a normal
+ * load, so one malformed entry is dropped rather than spoiling the rest. A
+ * version 1 backup, from before chapters, restores with none.
  */
 export function readBackup(text) {
   let body;
@@ -70,7 +74,9 @@ export function readBackup(text) {
   if (body.version > BACKUP_VERSION) {
     return { error: 'This backup is from a newer version of Life in Weeks. Reload the page, then try again.' };
   }
-  if (body.events !== undefined && !Array.isArray(body.events)) return { error: NOT_A_BACKUP };
+  for (const list of [body.events, body.chapters]) {
+    if (list !== undefined && !Array.isArray(list)) return { error: NOT_A_BACKUP };
+  }
 
   const birth = body.birthday === undefined || body.birthday === '' ? null : parseISODate(body.birthday);
   if (body.birthday !== undefined && body.birthday !== '' && !birth) {
@@ -78,16 +84,24 @@ export function readBackup(text) {
   }
 
   const data = clean({ ...body, birthday: birth ? toISODate(birth) : '' });
-  if (!hasData(data)) return { error: 'This backup is empty: it has no birthday or important weeks.' };
+  if (!hasData(data)) return { error: 'This backup is empty: it has no birthday, chapters or important weeks.' };
   return { data, exported: parseISODate(body.exported) ? body.exported : '' };
 }
 
-/** What `data` holds, in a line: `Born Jun 15, 1990 · 20 important weeks`. */
+/**
+ * What `data` holds, in a line: `Born Jun 15, 1990 · 3 chapters · 20 important weeks`.
+ * Chapters are only mentioned if there are some.
+ */
 export function summary(data) {
   const birth = parseISODate(data.birthday);
+  const count = (n, what) => `${n.toLocaleString('en-US')} ${what}${n === 1 ? '' : 's'}`;
+  const chapters = data.chapters?.length ?? 0;
   const n = data.events.length;
-  const weeks = n === 0 ? 'no important weeks' : `${n.toLocaleString('en-US')} important week${n === 1 ? '' : 's'}`;
-  return `${birth ? `Born ${formatDate(birth)}` : 'No birthday'} · ${weeks}`;
+  return [
+    birth ? `Born ${formatDate(birth)}` : 'No birthday',
+    ...(chapters ? [count(chapters, 'chapter')] : []),
+    n === 0 ? 'no important weeks' : count(n, 'important week'),
+  ].join(' · ');
 }
 
 /** The day a backup was made, like `Nov 5, 2026`, or '' if unknown. */

@@ -1,9 +1,9 @@
 // Life in Weeks — the Weeks and Settings screens.
 //
-// Runs entirely in the browser. The birthday, important weeks and theme are
-// read from (and written to) localStorage only; see storage.js. Nothing is
-// sent anywhere. A backup file (backup.js) is the only way they leave the
-// browser, and only when the person downloads one.
+// Runs entirely in the browser. The birthday, chapters, important weeks and
+// theme are read from (and written to) localStorage only; see storage.js.
+// Nothing is sent anywhere. A backup file (backup.js) is the only way they
+// leave the browser, and only when the person downloads one.
 //
 // Both screens live on this one page. The address picks which one shows:
 // `#settings` for Settings, anything else for the weeks.
@@ -22,9 +22,24 @@ import {
   eventsByWeek,
   sortEvents,
   cellState,
+  CHAPTERS_PER_WEEK,
+  chaptersByWeek,
+  chapterSpan,
+  sortChapters,
+  describeChapter,
 } from './weeks.js';
 import { STORAGE_KEY, load, save, askToKeep } from './storage.js';
-import { birthdayError, eventError, lastCalendarDay, addEvent, removeEvent } from './settings.js';
+import {
+  birthdayError,
+  eventError,
+  chapterError,
+  lastCalendarDay,
+  addEvent,
+  removeEvent,
+  addChapter,
+  removeChapter,
+  nextChapterColor,
+} from './settings.js';
 import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
 import { FORMATS, PICTURE_FONTS, drawPicture, pictureColors, pictureText, siteAddress } from './picture.js';
 import { hasData, backupFile, sizeError, readBackup, summary, exportedOn } from './backup.js';
@@ -38,13 +53,17 @@ const CELL_CLASS = { lived: 'w', ahead: 'w f', now: 'w n', event: 'w s' };
 
 const TITLES = { weeks: 'Life in Weeks', settings: 'Settings · Life in Weeks' };
 
-// The input to move to when an important week can't be added.
+// The input to move to when an important week or a chapter can't be added.
 const EVENT_FIELDS = { birthday: 'set-birthday', date: 'event-date', label: 'event-label' };
+const CHAPTER_FIELDS = { birthday: 'set-birthday', start: 'chapter-start', end: 'chapter-end', label: 'chapter-label' };
 
 let data = load();
 let gridKey = '';
 let events = new Map();
+let chapters = new Map(); // grid index → the chapters that week is in, in lane order
 let currentBirth = null;
+let currentToday = null;
+let currentNowIndex = -1;
 let hoverIndex = null;
 let shownBirthday = null; // the saved birthday last copied into the Settings field
 let askedToKeep = false; // asked the browser to keep the data, this visit
@@ -118,18 +137,39 @@ function renderWeeks(birth, today) {
   );
 
   events = eventsByWeek(birth, data.events, YEARS);
+  chapters = chaptersByWeek(birth, data.chapters, today, YEARS);
   currentBirth = birth;
+  currentToday = today;
+  currentNowIndex = stats.nowIndex;
   $('legend-events').hidden = events.size === 0;
   renderLegendColors();
+  renderLegendChapters(birth, today);
 
   // Rebuilding 5,200 cells is cheap but not free; only do it when the
-  // inputs that shape the grid change.
-  const key = [toISODate(birth), stats.nowIndex, JSON.stringify(data.events)].join('|');
+  // inputs that shape the grid change. A chapter that is still going grows
+  // with this week, which is in the key.
+  const key = [toISODate(birth), stats.nowIndex, JSON.stringify(data.events), JSON.stringify(data.chapters)].join('|');
   if (key !== gridKey) {
     gridKey = key;
     hidePopover();
     buildGrid(birth, stats.nowIndex);
   }
+}
+
+/** One legend entry per chapter on the grid, in date order: its color and name. */
+function renderLegendChapters(birth, today) {
+  const shown = sortChapters(data.chapters).filter((c) => chapterSpan(birth, c, today, YEARS));
+  $('legend-chapters').replaceChildren(
+    ...shown.map((chapter) => {
+      const item = document.createElement('li');
+      item.className = 'leg';
+      const swatch = document.createElement('span');
+      swatch.className = `lg lg-mark c-${chapter.color}`;
+      item.append(swatch, chapter.label);
+      return item;
+    }),
+  );
+  $('legend-chapters').hidden = shown.length === 0;
 }
 
 /** One legend swatch per color on the grid, in palette order. */
@@ -177,13 +217,27 @@ function buildGrid(birth, nowIndex) {
     for (let c = 0; c < WEEKS_PER_YEAR; c++) {
       const i = r * WEEKS_PER_YEAR + c;
       const state = cellState(i, nowIndex, events);
+      const inChapters = chapters.get(i);
       const cell = document.createElement('span');
       cell.className = CELL_CLASS[state];
-      if (state === 'event') cell.classList.add(`c-${weekColor(events.get(i))}`);
+      if (state === 'event') {
+        // An important week keeps its own color, set apart from its chapters'.
+        cell.classList.add(`c-${weekColor(events.get(i))}`);
+        if (inChapters) cell.classList.add('within');
+      } else if (inChapters && state !== 'now') {
+        // In chapters: a stripe of each one's color, in lane order, faded
+        // for weeks ahead. This week stays as it is.
+        cell.classList.add('ch');
+        for (const chapter of inChapters.slice(0, CHAPTERS_PER_WEEK)) {
+          const stripe = document.createElement('i');
+          stripe.className = `c-${chapter.color}`;
+          cell.append(stripe);
+        }
+      }
       // The week you were born is ringed, whatever else it is.
       if (i === BIRTH_WEEK) cell.classList.add('b');
-      if (state === 'event' || i === BIRTH_WEEK) {
-        cell.dataset.ev = String(i);
+      if (state === 'event' || i === BIRTH_WEEK || inChapters) {
+        cell.dataset.week = String(i);
       } else {
         cell.title =
           `Age ${r} · week ${c + 1} · ${formatDate(weekStart(birth, r, c))}` +
@@ -213,14 +267,22 @@ function renderSettings(birth, today) {
     button.setAttribute('aria-pressed', String(button.dataset.setTheme === data.theme));
   }
 
-  const date = $('event-date');
-  if (birth) {
-    date.min = toISODate(birth);
-    date.max = toISODate(lastCalendarDay(birth, YEARS));
-  } else {
-    date.removeAttribute('min');
-    date.removeAttribute('max');
+  // Every date field offers only the days on the calendar.
+  for (const date of [$('event-date'), $('chapter-start'), $('chapter-end')]) {
+    if (birth) {
+      date.min = toISODate(birth);
+      date.max = toISODate(lastCalendarDay(birth, YEARS));
+    } else {
+      date.removeAttribute('min');
+      date.removeAttribute('max');
+    }
   }
+  limitChapterEnd();
+
+  const sortedChapters = sortChapters(data.chapters);
+  $('chapter-list').replaceChildren(...sortedChapters.map((chapter) => chapterItem(chapter, birth, today)));
+  $('chapter-list').hidden = sortedChapters.length === 0;
+  $('no-chapters').hidden = sortedChapters.length > 0;
 
   const sorted = sortEvents(data.events);
   $('event-list').replaceChildren(...sorted.map((event) => eventItem(event, birth)));
@@ -236,30 +298,61 @@ function renderSettings(birth, today) {
   $('backup-empty').hidden = hasData(data);
 }
 
-function eventItem(event, birth) {
-  const item = $('event-item').content.firstElementChild.cloneNode(true);
-  const date = parseISODate(event.date);
-  item.querySelector('.lg').classList.add(`c-${event.color}`);
-  item.querySelector('.li-label').textContent = event.label;
-  item.querySelector('.li-meta').textContent = date ? formatWhen(birth, date) : event.date;
+/** One row of a list in Settings: a swatch, a label, a line under it and a remove button. */
+function listItem({ id, color, label, meta }) {
+  const item = $('list-item').content.firstElementChild.cloneNode(true);
+  item.querySelector('.lg').classList.add(`c-${color}`);
+  item.querySelector('.li-label').textContent = label;
+  item.querySelector('.li-meta').textContent = meta;
   const remove = item.querySelector('.x');
-  remove.dataset.remove = String(event.id);
-  remove.setAttribute('aria-label', `Remove ${event.label}`);
+  remove.dataset.remove = String(id);
+  remove.setAttribute('aria-label', `Remove ${label}`);
   return item;
 }
 
-// ---- Important-week popover ----------------------------------------------
+function eventItem(event, birth) {
+  const date = parseISODate(event.date);
+  return listItem({ ...event, meta: date ? formatWhen(birth, date) : event.date });
+}
+
+function chapterItem(chapter, birth, today) {
+  return listItem({ ...chapter, meta: describeChapter(birth, chapter, today, YEARS) });
+}
+
+// ---- Week popover ------------------------------------------------------------
+//
+// Hovering the week you were born, an important week or a week in a chapter
+// shows what it holds: the date, what happened that week, and the chapters
+// it is in with their dates.
+
+function popChapter(chapter) {
+  const line = $('pop-chapter').content.firstElementChild.cloneNode(true);
+  line.classList.add(`c-${chapter.color}`);
+  line.querySelector('.pop-ch-name').textContent = chapter.label;
+  line.querySelector('.pop-ch-when').textContent = describeChapter(currentBirth, chapter, currentToday, YEARS);
+  return line;
+}
 
 function showPopover(cell) {
-  const index = Number(cell.dataset.ev);
+  const index = Number(cell.dataset.week);
   const list = events.get(index) ?? [];
+  const inChapters = chapters.get(index) ?? [];
   const born = index === BIRTH_WEEK;
-  if ((!list.length && !born) || hoverIndex === index) return;
+  if ((!list.length && !born && !inChapters.length) || hoverIndex === index) return;
   hoverIndex = index;
 
-  // The week you were born comes first, then its important dates, if any.
-  $('pop-when').textContent = formatWhen(currentBirth, born ? currentBirth : parseISODate(list[0].date));
-  $('pop-title').textContent = [...(born ? ['You were born'] : []), ...list.map((e) => e.label)].join('\n');
+  // The date you were born, else the first important date that week, else
+  // the day the week starts.
+  const row = Math.floor(index / WEEKS_PER_YEAR);
+  const when = born ? currentBirth : list.length ? parseISODate(list[0].date) : weekStart(currentBirth, row, index % WEEKS_PER_YEAR);
+  $('pop-when').textContent = formatWhen(currentBirth, when) + (index === currentNowIndex ? ' · this week' : '');
+  // The week you were born comes first, then its important dates, if any,
+  // then the chapters it is in, top to bottom as on the grid.
+  const titles = [...(born ? ['You were born'] : []), ...list.map((e) => e.label)];
+  $('pop-title').textContent = titles.join('\n');
+  $('pop-title').hidden = titles.length === 0;
+  $('pop-chapters').replaceChildren(...inChapters.map(popChapter));
+  $('pop-chapters').hidden = inChapters.length === 0;
 
   const rows = $('rows');
   const wrap = rows.getBoundingClientRect();
@@ -280,7 +373,7 @@ function hidePopover() {
 }
 
 $('rows').addEventListener('mouseover', (e) => {
-  const cell = e.target.closest?.('[data-ev]');
+  const cell = e.target.closest?.('[data-week]');
   if (cell) showPopover(cell);
   else if (hoverIndex !== null) hidePopover();
 });
@@ -320,28 +413,104 @@ for (const button of document.querySelectorAll('[data-set-theme]')) {
   button.addEventListener('click', () => update({ theme: button.dataset.setTheme }));
 }
 
-// ---- Settings: important weeks --------------------------------------------
+// ---- Settings: color pickers ------------------------------------------------
+//
+// Chapters and important weeks each have a picker with the same colors.
 
-/** The color picker: one radio per color, the default checked. */
-function buildColorPicker() {
+/** A color picker in `container`: one radio per color, in the group `name`, with `checked` checked. */
+function buildColorPicker(container, name, checked) {
   const template = $('color-option').content.firstElementChild;
-  $('event-colors').replaceChildren(
+  $(container).replaceChildren(
     ...COLORS.map((color) => {
       const option = template.cloneNode(true);
       option.classList.add(`c-${color.id}`);
       option.title = color.name;
       const input = option.querySelector('input');
+      input.name = name;
       input.value = color.id;
-      input.checked = color.id === DEFAULT_COLOR;
+      input.checked = color.id === checked;
       option.querySelector('.vh').textContent = color.name;
       return option;
     }),
   );
 }
 
-function chosenColor() {
-  return $('event-form').querySelector('input[name="event-color"]:checked')?.value ?? DEFAULT_COLOR;
+function chosenColor(name) {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value ?? DEFAULT_COLOR;
 }
+
+function pickColor(name, id) {
+  const input = document.querySelector(`input[name="${name}"][value="${id}"]`);
+  if (input) input.checked = true;
+}
+
+/**
+ * The remove buttons in the list `list`: each takes its item out of
+ * `data[key]` with `remove`. Focus stays in the list: on the item that took
+ * this one's place, else the one before it, else on `fallback`.
+ */
+function handleRemove(list, key, remove, fallback) {
+  $(list).addEventListener('click', (e) => {
+    const button = e.target.closest('[data-remove]');
+    if (!button) return;
+    const at = [...$(list).querySelectorAll('[data-remove]')].indexOf(button);
+    update({ [key]: remove(data[key], Number(button.dataset.remove)) });
+    const left = $(list).querySelectorAll('[data-remove]');
+    (left[Math.min(at, left.length - 1)] ?? $(fallback)).focus();
+  });
+}
+
+// ---- Settings: chapters -----------------------------------------------------
+
+/** A chapter can't end before it began: the To picker starts from From, if it's set. */
+function limitChapterEnd() {
+  const start = $('chapter-start');
+  const from = start.value > start.min ? start.value : start.min; // dates as YYYY-MM-DD compare as text
+  if (from) $('chapter-end').min = from;
+  else $('chapter-end').removeAttribute('min');
+}
+
+function showChapterError(problem) {
+  const err = $('chapter-error');
+  err.textContent = problem?.message ?? '';
+  err.hidden = !problem;
+  for (const field of ['start', 'end', 'label']) {
+    $(CHAPTER_FIELDS[field]).setAttribute('aria-invalid', problem?.field === field ? 'true' : 'false');
+  }
+}
+
+$('chapter-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const start = $('chapter-start');
+  const end = $('chapter-end');
+  const label = $('chapter-label');
+  // A half-typed date reads as empty; don't take it to mean "still going".
+  const endValue = end.validity.badInput ? '?' : end.value;
+  const problem = chapterError(data.birthday, start.value, endValue, label.value, startOfToday(), YEARS);
+  showChapterError(problem);
+  if (problem) {
+    $(CHAPTER_FIELDS[problem.field]).focus();
+    return;
+  }
+  const next = addChapter(data.chapters, start.value, end.value, label.value, chosenColor('chapter-color'));
+  update({ chapters: next });
+  start.value = '';
+  end.value = '';
+  label.value = '';
+  // Offer the color the fewest chapters have, so the next one stands apart.
+  pickColor('chapter-color', nextChapterColor(next));
+  limitChapterEnd();
+  start.focus();
+});
+
+for (const id of ['chapter-start', 'chapter-end', 'chapter-label']) {
+  $(id).addEventListener('input', () => showChapterError(null));
+}
+$('chapter-start').addEventListener('change', limitChapterEnd);
+
+handleRemove('chapter-list', 'chapters', removeChapter, 'chapter-start');
+
+// ---- Settings: important weeks --------------------------------------------
 
 function showEventError(problem) {
   const err = $('event-error');
@@ -362,7 +531,7 @@ $('event-form').addEventListener('submit', (e) => {
     return;
   }
   // The color stays as picked, so several weeks of one kind are quick to add.
-  update({ events: addEvent(data.events, date.value, label.value, chosenColor()) });
+  update({ events: addEvent(data.events, date.value, label.value, chosenColor('event-color')) });
   date.value = '';
   label.value = '';
   date.focus();
@@ -371,16 +540,7 @@ $('event-form').addEventListener('submit', (e) => {
 $('event-date').addEventListener('input', () => showEventError(null));
 $('event-label').addEventListener('input', () => showEventError(null));
 
-$('event-list').addEventListener('click', (e) => {
-  const button = e.target.closest('[data-remove]');
-  if (!button) return;
-  const at = [...$('event-list').querySelectorAll('[data-remove]')].indexOf(button);
-  update({ events: removeEvent(data.events, Number(button.dataset.remove)) });
-  // Keep focus in the list: on the item that took this one's place, else the
-  // one before it, else back on the form.
-  const left = $('event-list').querySelectorAll('[data-remove]');
-  (left[Math.min(at, left.length - 1)] ?? $('event-date')).focus();
-});
+handleRemove('event-list', 'events', removeEvent, 'event-date');
 
 // ---- Share pictures ---------------------------------------------------------
 //
@@ -432,6 +592,7 @@ async function makePicture(format) {
     format,
     stats,
     events: eventsByWeek(birth, data.events, YEARS),
+    chapters: chaptersByWeek(birth, data.chapters, today, YEARS),
     colors: themeColors(),
     site: siteAddress(location.href),
   });
@@ -642,6 +803,8 @@ $('restore-dialog').addEventListener('close', () => {
 
 function restore({ data: restored, exported }) {
   update(restored);
+  // A different set of chapters: offer the color they use least.
+  pickColor('chapter-color', nextChapterColor(data.chapters));
   const on = exportedOn(exported);
   setBackupStatus(`Restored your backup${on ? ` from ${on}` : ''}: ${summary(data)}.`);
   focusAfterRestore();
@@ -669,6 +832,7 @@ window.addEventListener('hashchange', () => {
   if ($('restore-dialog').open) $('restore-dialog').close();
   hidePopover();
   showBirthdayError('');
+  showChapterError(null);
   showEventError(null);
   setBackupStatus('');
   showRestoreError('');
@@ -703,6 +867,7 @@ function hideMissingPhoto() {
 $('me-photo').addEventListener('error', hideMissingPhoto);
 if ($('me-photo').complete && !$('me-photo').naturalWidth) hideMissingPhoto();
 
-buildColorPicker();
+buildColorPicker('chapter-colors', 'chapter-color', nextChapterColor(data.chapters));
+buildColorPicker('event-colors', 'event-color', DEFAULT_COLOR);
 buildFormatButtons();
 render();

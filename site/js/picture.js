@@ -2,11 +2,11 @@
 // post on Instagram, a LinkedIn post or a post on X. Drawn on a canvas in
 // the browser; nothing is uploaded.
 //
-// pictureLayout, pictureText and siteAddress are pure, so they are unit
-// tested. drawPicture only uses the 2D canvas context it is given.
+// pictureLayout, cellBox, stripeBox, pictureText and siteAddress are pure,
+// so they are unit tested. drawPicture only uses the 2D canvas context it is given.
 
-import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, cellState } from './weeks.js';
-import { COLORS, weekColor } from './colors.js';
+import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, CHAPTERS_PER_WEEK, cellState } from './weeks.js';
+import { COLORS, colorOrDefault, weekColor } from './colors.js';
 
 /**
  * The picture formats, in the order the Share buttons show them. Each is
@@ -82,7 +82,7 @@ export const PICTURE_FONTS = [`500 60px ${SANS}`, `400 24px ${SANS}`, `400 24px 
 const fmtInt = (n) => n.toLocaleString('en-US');
 const weeks = (n) => `${fmtInt(n)} ${n === 1 ? 'week' : 'weeks'}`;
 
-/** The theme tokens drawPicture's `colors` are read from, besides the important-week shades and the halo. */
+/** The theme tokens drawPicture's `colors` are read from, besides the color shades, the halo and the tint. */
 const THEME_TOKENS = ['bg', 'text', 'ink', 'muted', 'future', 'now', 'nowA'];
 
 /**
@@ -94,6 +94,7 @@ export function pictureColors(token) {
     ...Object.fromEntries(THEME_TOKENS.map((name) => [name, token(name)])),
     marks: Object.fromEntries(COLORS.map((c) => [c.id, token(`c-${c.id}`)])),
     halo: (parseFloat(token('halo')) || 30) / 100,
+    tint: (parseFloat(token('tint')) || 35) / 100,
   };
 }
 
@@ -235,6 +236,31 @@ export function cellBox(grid, index) {
   };
 }
 
+/**
+ * Stripe `k` of `n` across week `index`, for a week in `n` chapters, as
+ * `{ x, y, w, h, radii }`. The stripes run the way time does, so a chapter
+ * reads as one band from week to week: on a grid of rows (weeks running
+ * across) they are stacked top to bottom; on a grid of columns (weeks
+ * running down) they sit side by side. Only the week's outer corners are
+ * rounded (`radii` as for roundRect: top left, top right, bottom right,
+ * bottom left), so together the stripes make one week.
+ */
+export function stripeBox(grid, index, k, n) {
+  const box = cellBox(grid, index);
+  const r = Math.max(1, Math.round(grid.cellH / 5));
+  if (n === 1) return { ...box, radii: r };
+  const first = k === 0;
+  const last = k === n - 1;
+  if (grid.byColumns) {
+    const x = box.x + Math.round((k * box.w) / n);
+    const w = box.x + Math.round(((k + 1) * box.w) / n) - x;
+    return { x, y: box.y, w, h: box.h, radii: [first ? r : 0, last ? r : 0, last ? r : 0, first ? r : 0] };
+  }
+  const y = box.y + Math.round((k * box.h) / n);
+  const h = box.y + Math.round(((k + 1) * box.h) / n) - y;
+  return { x: box.x, y, w: box.w, h, radii: [first ? r : 0, first ? r : 0, last ? r : 0, last ? r : 0] };
+}
+
 // ---- Drawing ---------------------------------------------------------------
 
 function addRect(ctx, x, y, w, h, radius) {
@@ -265,6 +291,15 @@ function fillCells(ctx, grid, indexes, color, grow = 0) {
     const box = cellBox(grid, index);
     addRect(ctx, box.x - grow, box.y - grow, box.w + 2 * grow, box.h + 2 * grow, radius + grow);
   }
+  ctx.fill();
+}
+
+/** Fill `boxes` (from stripeBox) in one go. */
+function fillBoxes(ctx, boxes, color) {
+  if (!boxes.length) return;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (const { x, y, w, h, radii } of boxes) addRect(ctx, x, y, w, h, radii);
   ctx.fill();
 }
 
@@ -314,19 +349,23 @@ function drawMark(ctx, x, y, colors) {
  *
  * - `stats`: lifeStats() for today
  * - `events`: eventsByWeek(), the important weeks by grid index
+ * - `chapters`: chaptersByWeek(), the chapters by grid index
  * - `colors`: the theme's bg, text, ink, muted, future, now and nowA; `marks`,
- *   the shade of each important-week color by id (from colors.js); and
- *   `halo`, how opaque (0–1) the ring around an important week is
+ *   the shade of each color by id (from colors.js); `halo`, how opaque (0–1)
+ *   the ring around an important week is; and `tint`, how opaque a
+ *   chapter's shade is over its weeks ahead
  * - `site`: the address to print at the bottom, or ''
  * - `text`: the words, shaped like pictureText(stats), which they default
  *   to: the eyebrow, then the title's two parts, `lived` in the text color
  *   and `ahead` muted
  *
- * Important weeks show in their colors but their labels are left off: the
- * picture is meant to be posted, the labels are private. The week you were
- * born is ringed in the this-week color, as on the page.
+ * Chapters and important weeks show in their colors but their names are
+ * left off: the picture is meant to be posted, the names are private. As
+ * on the page, a chapter's weeks ahead are a faded tint of its color, and
+ * this week and important weeks show over chapters. The week you were born
+ * is ringed in the this-week color.
  */
-export function drawPicture(ctx, { format = FORMATS.story, stats, events, colors, site = '', text = pictureText(stats) }) {
+export function drawPicture(ctx, { format = FORMATS.story, stats, events, chapters = new Map(), colors, site = '', text = pictureText(stats) }) {
   const layout = pictureLayout(format, { years: stats.years, footer: Boolean(site) });
   const { grid } = layout;
 
@@ -386,24 +425,51 @@ export function drawPicture(ctx, { format = FORMATS.story, stats, events, colors
   for (const index of groups.event) byColor.get(weekColor(events.get(index))).push(index);
   const marks = [...byColor].filter(([, indexes]) => indexes.length).map(([id, indexes]) => ({ shade: colors.marks[id], indexes }));
 
-  // This week and important weeks are drawn a little bigger, with a ring,
-  // as on the page. The week you were born is left for last, since its ring
-  // goes over its neighbours.
+  // Weeks in chapters, lived and ahead: a stripe per chapter shown (see
+  // stripeBox), grouped by color in palette order.
+  const stripesOf = (index) => {
+    const shown = chapters.get(index).slice(0, CHAPTERS_PER_WEEK);
+    return shown.map((chapter, k) => ({ id: colorOrDefault(chapter.color), box: stripeBox(grid, index, k, shown.length) }));
+  };
+  const stripes = (indexes) => {
+    const lists = new Map(COLORS.map((c) => [c.id, []]));
+    for (const index of indexes) for (const { id, box } of stripesOf(index)) lists.get(id).push(box);
+    return [...lists].filter(([, boxes]) => boxes.length).map(([id, boxes]) => ({ id, shade: colors.marks[id], boxes }));
+  };
+  const notBirth = (indexes) => indexes.filter((i) => i !== BIRTH_WEEK);
+  const inChapters = (indexes) => notBirth(indexes).filter((i) => chapters.has(i));
+  const livedIn = stripes(inChapters(groups.lived));
+  const aheadIn = stripes(inChapters(groups.ahead));
+  const birthState = cellState(BIRTH_WEEK, stats.nowIndex, events);
+  const birthStripes = birthState === 'lived' && chapters.has(BIRTH_WEEK) ? stripesOf(BIRTH_WEEK) : [];
+  const chapterColors = new Set([...livedIn, ...aheadIn, ...birthStripes].map((s) => s.id));
+  const chapterShades = COLORS.filter((c) => chapterColors.has(c.id)).map((c) => colors.marks[c.id]);
+
+  // Lived weeks in ink, or in their chapters' colors; weeks ahead with a
+  // tint of their chapters' colors over them. This week and important
+  // weeks are drawn a little bigger, with a ring, as on the page; an
+  // important week in a chapter has a gap of background around it, so it
+  // stands out even in the chapter's color. The week you were born is left
+  // for last, since its ring goes over its neighbours.
   const grow = Math.max(1, Math.round(grid.cellH * 0.1));
   const ring = (share) => grow + Math.max(2, Math.round(grid.cellH * share));
-  const notBirth = (indexes) => indexes.filter((i) => i !== BIRTH_WEEK);
-  fillCells(ctx, grid, notBirth(groups.lived), colors.ink);
+  fillCells(ctx, grid, notBirth(groups.lived.filter((i) => !chapters.has(i))), colors.ink);
+  for (const { shade, boxes } of livedIn) fillBoxes(ctx, boxes, shade);
   fillCells(ctx, grid, notBirth(groups.ahead), colors.future);
+  ctx.globalAlpha = colors.tint;
+  for (const { shade, boxes } of aheadIn) fillBoxes(ctx, boxes, shade);
+  ctx.globalAlpha = 1;
   fillCells(ctx, grid, notBirth(groups.now), colors.nowA, ring(0.35));
   fillCells(ctx, grid, notBirth(groups.now), colors.now, grow);
   ctx.globalAlpha = colors.halo;
   for (const { shade, indexes } of marks) fillCells(ctx, grid, notBirth(indexes), shade, ring(0.18));
   ctx.globalAlpha = 1;
+  const gapAround = grow + Math.max(1, Math.round(grid.cellH * 0.12));
+  fillCells(ctx, grid, notBirth(groups.event.filter((i) => chapters.has(i))), colors.bg, gapAround);
   for (const { shade, indexes } of marks) fillCells(ctx, grid, notBirth(indexes), shade, grow);
 
-  // The week you were born: its own color inside a ring of the this-week
-  // color, with a gap of background between.
-  const birthState = cellState(BIRTH_WEEK, stats.nowIndex, events);
+  // The week you were born: its own color, or its chapters' stripes, inside
+  // a ring of the this-week color, with a gap of background between.
   const [birthColor, birthGrow] = {
     lived: [colors.ink, 0],
     now: [colors.now, grow],
@@ -413,7 +479,8 @@ export function drawPicture(ctx, { format = FORMATS.story, stats, events, colors
   const birthBox = cellBox(grid, BIRTH_WEEK);
   const birthRing = { color: colors.now, bg: colors.bg, gap: Math.max(1, Math.round(grid.cellH * 0.1)), width: Math.max(2, Math.round(grid.cellH * 0.2)) };
   ringBox(ctx, { x: birthBox.x - birthGrow, y: birthBox.y - birthGrow, w: birthBox.w + 2 * birthGrow, h: birthBox.h + 2 * birthGrow }, radius + birthGrow, birthRing);
-  fillCells(ctx, grid, [BIRTH_WEEK], birthColor, birthGrow);
+  if (birthStripes.length) for (const { id, box } of birthStripes) fillBoxes(ctx, [box], colors.marks[id]);
+  else fillCells(ctx, grid, [BIRTH_WEEK], birthColor, birthGrow);
 
   // The site's address, at the right end of the legend's line or on a line
   // of its own below it.
@@ -433,15 +500,16 @@ export function drawPicture(ctx, { format = FORMATS.story, stats, events, colors
     }
   }
 
-  // Legend, shrunk to the room it has if it has to be. Important weeks get
-  // one swatch per color on the grid, side by side, as on the page. Born's
-  // swatch is ringed like the week.
+  // Legend, shrunk to the room it has if it has to be. Chapters and
+  // important weeks each get one swatch per color on the grid, side by
+  // side, as on the page. Born's swatch is ringed like the week.
   const items = [
     ['Lived', [colors.ink]],
     ['Ahead', [colors.future]],
   ];
   if (groups.now.length) items.push(['This week', [colors.now]]);
   items.push(['Born', [colors.ink], true]);
+  if (chapterShades.length) items.push(['Chapter', chapterShades]);
   if (marks.length) items.push(['Important week', marks.map((m) => m.shade)]);
   const legendFont = (s) => `400 ${s}px ${SANS}`;
   const swatchSize = (s) => Math.round(s * 0.75);

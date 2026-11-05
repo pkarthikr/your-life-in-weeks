@@ -121,6 +121,7 @@
   --nowA: rgba(255, 181, 71, .5);
   --mark: var(--c-blue);
   --halo: 30%;
+  --tint: 35%;
   --c-blue: #6E9BF5;
   --c-violet: #A05DDB;
   --c-pink: #F697CE;
@@ -146,6 +147,7 @@
   --nowA: rgba(228, 87, 46, .45);
   --mark: var(--c-blue);
   --halo: 25%;
+  --tint: 35%;
   --c-blue: #2F6FEB;
   --c-violet: #913FD5;
   --c-pink: #EB64A7;
@@ -159,11 +161,12 @@
   color-scheme: light;
 }
 
-/* Colors for important weeks (ids from js/colors.js). Each class points
-   --mark at its shade for the current theme; anything that paints with
-   --mark (a week, a legend swatch, a picker swatch) follows it. The shades
-   were checked to stay apart from each other and from the lived, ahead and
-   this-week squares in both themes. */
+/* Colors for chapters and important weeks (ids from js/colors.js). Each
+   class points --mark at its shade for the current theme; anything that
+   paints with --mark (a week, a legend swatch, a picker swatch) follows it.
+   The shades were checked to stay apart from each other and from the
+   lived, ahead and this-week squares in both themes. --tint is how much of
+   a chapter's shade shows in its weeks ahead. */
 .c-blue { --mark: var(--c-blue); }
 .c-violet { --mark: var(--c-violet); }
 .c-pink { --mark: var(--c-pink); }
@@ -208,6 +211,7 @@ a { color: inherit; }
 .ax,
 .statn,
 .pop-when,
+.pop-ch-when,
 .li-meta,
 .fmt-size { font-family: 'Geist Mono', ui-monospace, monospace; }
 
@@ -464,6 +468,12 @@ a { color: inherit; }
   margin: 0 3px;
 }
 
+/* The chapters on the grid, by name, on a line of their own. */
+.legend-chapters {
+  margin: -6px 0 0;
+  list-style: none;
+}
+
 /* The colors of the important weeks on the grid, side by side. */
 .lg-set {
   display: flex;
@@ -524,6 +534,23 @@ a { color: inherit; }
   animation: pulse 2.2s ease-out infinite;
 }
 
+/* A week in chapters: one stripe per chapter, stacked in lane order (one
+   chapter fills the week). Each stripe is its chapter's color, faded for
+   weeks ahead so the line between lived and ahead still shows. */
+.w.ch {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.w.ch > i {
+  flex: 1 1 0;
+  background: var(--mark);
+}
+
+.w.f.ch > i { background: color-mix(in srgb, var(--mark) var(--tint), var(--future)); }
+
 .w.s {
   background: var(--mark);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--mark) var(--halo), transparent);
@@ -533,9 +560,15 @@ a { color: inherit; }
   z-index: 1;
 }
 
+/* An important week in a chapter: a gap of background around it, so it
+   stands out from the chapter even in the same color. */
+.w.s.within {
+  box-shadow: 0 0 0 1.5px var(--bg), 0 0 0 3px color-mix(in srgb, var(--mark) var(--halo), var(--bg));
+}
+
 /* The week you were born: a ring in the this-week color, with a gap of
-   background so the week keeps its own color inside (lived, or an important
-   week's color). A ring rather than another color, so it can't be mistaken
+   background so the week keeps its own color inside (lived, its chapters'
+   stripes, or an important week's color). A ring rather than another color, so it can't be mistaken
    for an important week. */
 :root { --born-ring: 0 0 0 1.5px var(--bg), 0 0 0 3px var(--now); }
 
@@ -586,6 +619,35 @@ a { color: inherit; }
   line-height: 1.3;
   white-space: pre-line;
   overflow-wrap: anywhere;
+}
+
+/* The chapters a week is in: a bar of the chapter's color, its name and
+   its dates. */
+.pop-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pop-ch {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 3px solid var(--mark);
+}
+
+.pop-ch-name {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.pop-ch-when {
+  font-size: 11px;
+  color: var(--popmu);
 }
 
 .pop-a {
@@ -888,6 +950,9 @@ a { color: inherit; }
 
 .field-date { flex: 1 1 160px; }
 .field-what { flex: 2 1 220px; }
+.field-from,
+.field-to { flex: 1 1 140px; }
+.field-name { flex: 2 1 200px; }
 
 /* Color picker: a row of swatch radios on a line of its own, with Add
    beside it where there is room (below it on phones). */

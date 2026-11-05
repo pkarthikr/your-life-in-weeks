@@ -64,6 +64,12 @@ export function weekPosition(birth, date) {
   return { row, col: Math.min(WEEKS_PER_YEAR - 1, Math.floor(days / 7)) };
 }
 
+/** The grid index of the week `date` falls in, or null if it is before the birthday. */
+export function weekIndex(birth, date) {
+  const pos = weekPosition(birth, date);
+  return pos ? pos.row * WEEKS_PER_YEAR + pos.col : null;
+}
+
 /**
  * A date and the week it falls in, like `Mar 2, 2015 · age 24, week 38`
  * (week counted from 1). Just the date if it is before the birthday.
@@ -114,6 +120,90 @@ export function eventsByWeek(birth, events, years = YEARS) {
     if (!map.has(index)) map.set(index, []);
     map.get(index).push(event);
   }
+  return map;
+}
+
+// ---- Chapters --------------------------------------------------------------
+//
+// A chapter is a stretch of weeks: college, a job, the years in a city.
+// It has a start date and an end date, or no end date while it is still
+// going, in which case it runs up to this week.
+
+const compare = (a, z) => (a < z ? -1 : a > z ? 1 : 0);
+
+/**
+ * Chapters in the order to list them: by start date, then by end date,
+ * with one that is still going after one that has ended. Chapters that
+ * match keep their order.
+ */
+export function sortChapters(chapters) {
+  return [...chapters].sort((a, z) => compare(a.start, z.start) || compare(a.end || '~', z.end || '~'));
+}
+
+/**
+ * The weeks a chapter covers on the grid, as `{ first, last }` grid indexes
+ * (both included), or null if none of it is on the grid. One that is still
+ * going runs up to the week `today` is in. A part before the birthday or
+ * past the end of the grid is cut off.
+ */
+export function chapterSpan(birth, chapter, today, years = YEARS) {
+  const start = parseISODate(chapter.start);
+  const end = chapter.end ? parseISODate(chapter.end) : today;
+  if (!birth || !start || !end || end < start || end < birth) return null;
+  const first = start < birth ? 0 : weekIndex(birth, start);
+  const last = Math.min(years * WEEKS_PER_YEAR - 1, weekIndex(birth, end));
+  return first <= last ? { first, last } : null;
+}
+
+/**
+ * A chapter's dates and how many weeks of the grid it covers, like
+ * `Sep 1, 2008 – May 15, 2012 · 194 weeks`, or `Sep 1, 2019 – now · 375 weeks`
+ * for one that is still going. Without a birthday, or if none of it is on
+ * the grid, just the dates.
+ */
+export function describeChapter(birth, chapter, today, years = YEARS) {
+  const show = (value) => {
+    const date = parseISODate(value);
+    return date ? formatDate(date) : value;
+  };
+  const dates = `${show(chapter.start)} – ${chapter.end ? show(chapter.end) : 'now'}`;
+  const span = birth ? chapterSpan(birth, chapter, today, years) : null;
+  if (!span) return dates;
+  const n = span.last - span.first + 1;
+  return `${dates} · ${n.toLocaleString('en-US')} ${n === 1 ? 'week' : 'weeks'}`;
+}
+
+/** At most this many chapters share a week on the grid; any more show only in its popover. */
+export const CHAPTERS_PER_WEEK = 3;
+
+/**
+ * Group chapters by grid index: for each week, the chapters it is in.
+ *
+ * Chapters can overlap (a job, while living in a city, while in a
+ * relationship), so each one gets a lane, kept for all its weeks: the
+ * first lane that is free when it begins. A chapter that begins with or
+ * inside another gets the lane after it. A week lists its chapters in
+ * lane order, which is the order the grid stacks them in.
+ */
+export function chaptersByWeek(birth, chapters, today, years = YEARS) {
+  const placed = chapters
+    .map((chapter, order) => ({ chapter, order, span: chapterSpan(birth, chapter, today, years) }))
+    .filter((c) => c.span)
+    .sort((a, z) => a.span.first - z.span.first || z.span.last - a.span.last || a.order - z.order);
+
+  const laneEnds = []; // the last week taken in each lane so far
+  const map = new Map();
+  for (const { chapter, span } of placed) {
+    let lane = laneEnds.findIndex((end) => end < span.first);
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = span.last;
+    for (let i = span.first; i <= span.last; i++) {
+      const list = map.get(i);
+      if (list) list.push({ lane, chapter });
+      else map.set(i, [{ lane, chapter }]);
+    }
+  }
+  for (const [i, list] of map) map.set(i, list.sort((a, z) => a.lane - z.lane).map((c) => c.chapter));
   return map;
 }
 
