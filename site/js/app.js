@@ -159,14 +159,10 @@ function renderWeeks(birth, today) {
   const { stats } = grid;
 
   $('years').textContent = formatYears(stats.years);
-  $('years-2').textContent = formatYears(stats.years);
   $('total').textContent = fmtInt(stats.total);
   $('born').textContent = formatDate(birth);
   $('week').textContent = stats.week;
   $('age').textContent = stats.age;
-  $('lived').textContent = fmtInt(stats.lived);
-  $('ahead').textContent = fmtInt(stats.ahead);
-  $('pct').textContent = stats.percent.toFixed(1);
 
   const rows = $('rows');
   rows.setAttribute(
