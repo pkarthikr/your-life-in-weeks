@@ -568,6 +568,17 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') render();
 });
 
+// ---- About ------------------------------------------------------------------
+
+// The author's photo is copied into the site when it is deployed. Running
+// locally, or if that copy failed, hide the broken image so the initials
+// underneath show. It may have failed before this module ran.
+function hideMissingPhoto() {
+  $('me-photo').hidden = true;
+}
+$('me-photo').addEventListener('error', hideMissingPhoto);
+if ($('me-photo').complete && !$('me-photo').naturalWidth) hideMissingPhoto();
+
 buildColorPicker();
 buildFormatButtons();
 render();
