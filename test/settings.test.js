@@ -8,7 +8,12 @@ import {
   lastCalendarDay,
   addEvent,
   removeEvent,
+  chapterError,
+  addChapter,
+  removeChapter,
+  nextChapterColor,
 } from '../site/js/settings.js';
+import { COLORS } from '../site/js/colors.js';
 
 const d = (s) => parseISODate(s);
 const today = d('2026-11-04');
@@ -76,4 +81,68 @@ test('removeEvent drops only the matching id', () => {
   assert.deepEqual(removeEvent(events, 1), [{ id: 2, date: '2012-01-01', label: 'B' }]);
   assert.deepEqual(removeEvent(events, 9), events);
   assert.equal(events.length, 2, 'does not change the list it was given');
+});
+
+// ---- Chapters -----------------------------------------------------------------
+
+test('chapterError accepts finished, future and still-going chapters on the calendar', () => {
+  const last = toISODate(lastCalendarDay(d('1990-06-15')));
+  assert.equal(chapterError('1990-06-15', '2008-08-25', '2012-05-15', 'College', today), null);
+  assert.equal(chapterError('1990-06-15', '2019-09-01', '', 'London', today), null);
+  assert.equal(chapterError('1990-06-15', '2026-11-04', '', 'Began today', today), null);
+  assert.equal(chapterError('1990-06-15', '2027-09-01', '2029-06-30', 'Sabbatical', today), null);
+  assert.equal(chapterError('1990-06-15', '1990-06-15', last, 'All of it', today), null);
+  assert.equal(chapterError('1990-06-15', '2010-01-01', '2010-01-01', 'One day', today), null);
+});
+
+test('chapterError names the field to fix', () => {
+  const pastEnd = toISODate(addDays(lastCalendarDay(d('1990-06-15')), 1));
+  const check = (start, end, label) => chapterError('1990-06-15', start, end, label, today);
+  assert.deepEqual(chapterError('', '2008-08-25', '', 'x', today), { field: 'birthday', message: 'Add your birthday first.' });
+  assert.deepEqual(check('', '', 'x'), { field: 'start', message: 'Pick when it began.' });
+  assert.deepEqual(check('2008-08-25', '2012-02-30', 'x'), { field: 'end', message: 'Pick when it ended, or leave To empty if it’s still going.' });
+  assert.deepEqual(check('2008-08-25', '', '  '), { field: 'label', message: 'Give it a name.' });
+  assert.deepEqual(check('1990-06-14', '', 'x'), { field: 'start', message: 'That date is before you were born.' });
+  assert.deepEqual(check(pastEnd, '', 'x'), { field: 'start', message: 'That date is past the end of your calendar.' });
+  assert.deepEqual(check('2008-08-25', pastEnd, 'x'), { field: 'end', message: 'That date is past the end of your calendar.' });
+  assert.deepEqual(check('2012-05-15', '2008-08-25', 'x'), { field: 'end', message: 'That’s before it began.' });
+  assert.deepEqual(check('2026-11-05', '', 'x'), { field: 'end', message: 'It hasn’t begun yet, so add when it ends.' });
+});
+
+test('important weeks and chapters use the same calendar limits', () => {
+  for (const date of ['1990-06-14', '1990-06-15', '2090-06-14', '2090-06-15']) {
+    const event = eventError('1990-06-15', date, 'x');
+    const chapter = chapterError('1990-06-15', date, '', 'x', d('2100-01-01'));
+    assert.equal(event?.message, chapter?.message, date);
+  }
+});
+
+test('addChapter appends with the next free id, trims the name and keeps the color', () => {
+  assert.deepEqual(addChapter([], '2008-08-25', '2012-05-15', ' College ', 'teal'), [
+    { id: 1, start: '2008-08-25', end: '2012-05-15', label: 'College', color: 'teal' },
+  ]);
+  const chapters = [{ id: 3, start: '2008-08-25', end: '', label: 'A', color: 'blue' }];
+  const next = addChapter(chapters, '2019-09-01', '', 'London', 'neon');
+  assert.deepEqual(next.at(-1), { id: 4, start: '2019-09-01', end: '', label: 'London', color: 'blue' });
+  assert.equal(addChapter([], '2019-09-01', undefined, 'x').at(-1).end, '');
+  assert.equal(chapters.length, 1, 'does not change the list it was given');
+});
+
+test('removeChapter drops only the matching id', () => {
+  const chapters = [{ id: 1, label: 'A' }, { id: 2, label: 'B' }];
+  assert.deepEqual(removeChapter(chapters, 1), [{ id: 2, label: 'B' }]);
+  assert.deepEqual(removeChapter(chapters, 9), chapters);
+  assert.equal(chapters.length, 2);
+});
+
+test('nextChapterColor offers the color the fewest chapters have, first in the palette on a tie', () => {
+  const with_ = (...colors) => colors.map((color, i) => ({ id: i + 1, color }));
+  assert.equal(nextChapterColor([]), COLORS[0].id);
+  assert.equal(nextChapterColor(with_('blue')), 'violet');
+  assert.equal(nextChapterColor(with_('violet')), 'blue');
+  assert.equal(nextChapterColor(with_('blue', 'violet', 'pink', 'red', 'green')), 'teal');
+  // Every color once: round again from the start.
+  assert.equal(nextChapterColor(with_(...COLORS.map((c) => c.id))), COLORS[0].id);
+  assert.equal(nextChapterColor(with_(...COLORS.map((c) => c.id), 'blue')), 'violet');
+  assert.equal(nextChapterColor(with_('neon')), COLORS[0].id);
 });
