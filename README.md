@@ -1,6 +1,6 @@
 # Life in Weeks
 
-Your whole life on one page: one square per week, one row per year, for as many years as you choose to count (100 until you pick).
+Your whole life on one page: one square per week, one row per year, for as many years as you choose to count (90 until you pick).
 
 Inspired by Tim Urban's [Your Life in Weeks](https://waitbutwhy.com/2014/05/life-weeks.html) on Wait But Why.
 
@@ -73,7 +73,7 @@ test/            unit tests (node --test)
 
 ## Life span
 
-Settings → **Your life span** sets how many years the grid counts. Pick a country and Average, Male or Female, and it uses that country's life expectancy at birth; or type your own number (1 to 150, decimals fine, e.g. 120), which wins. Until one is chosen it stays at 100 years.
+Settings → **Your life span** sets how many years the grid counts. Pick a country and Average, Male or Female, and it uses that country's life expectancy at birth; or type your own number (1 to 150, decimals fine, e.g. 120), which wins. Until one is chosen it stays at 90 years.
 
 The figures are the World Health Organization's life expectancy at birth ([Global Health Observatory](https://www.who.int/data/gho/data/indicators/indicator-details/GHO/life-expectancy-at-birth-(years)), CC BY-NC-SA 3.0 IGO). They are saved in `site/js/life-expectancy.js`, so the app never looks anything up. To refresh them when WHO publishes a new year, run `npm run life-expectancy` and commit the result. It is an average at birth, not a forecast for any one person.
 

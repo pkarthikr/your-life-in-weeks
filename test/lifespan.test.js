@@ -40,7 +40,7 @@ test('a country and sex give that country’s figure', () => {
   assert.equal(findCountry('ZZZ'), null);
 });
 
-test('a number of your own wins, then the country’s figure, then 100', () => {
+test('a number of your own wins, then the country’s figure, then 90', () => {
   const india = findCountry('IND');
   assert.deepEqual(lifespanYears({ country: 'IND', sex: 'male', custom: 120 }), { years: 120, basis: 'custom' });
   assert.deepEqual(lifespanYears({ country: 'IND', sex: 'male', custom: null }), { years: india.male, basis: 'country' });
@@ -70,7 +70,7 @@ test('years read as a person would say them', () => {
 });
 
 test('describeLifespan says where the number comes from', () => {
-  assert.match(describeLifespan(DEFAULT_LIFESPAN), /100 years\. Pick a country/);
+  assert.match(describeLifespan(DEFAULT_LIFESPAN), /90 years\. Pick a country/);
   assert.match(describeLifespan({ country: '', sex: 'both', custom: 120 }), /120 years, the number you set/);
   const text = describeLifespan({ country: 'IND', sex: 'male', custom: null });
   assert.match(text, /men in India, 2023/);
