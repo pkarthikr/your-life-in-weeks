@@ -107,7 +107,7 @@ export function totalWeeks(years = YEARS) {
  * - `past`: whether the grid runs on past the span
  *
  * Someone who has outlived their span has lived `nowIndex` weeks, with none
- * ahead, and is 100% of the way.
+ * ahead.
  */
 export function lifeStats(birth, today, years = YEARS, reach = -1) {
   const total = totalWeeks(years);
@@ -125,7 +125,6 @@ export function lifeStats(birth, today, years = YEARS, reach = -1) {
     nowIndex,
     lived: nowIndex,
     ahead: Math.max(0, total - nowIndex - 1),
-    percent: Math.min(100, (nowIndex / total) * 100),
   };
 }
 

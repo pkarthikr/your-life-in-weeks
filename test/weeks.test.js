@@ -105,7 +105,6 @@ test('lifeStats for someone born today', () => {
   assert.equal(s.week, 1);
   assert.equal(s.lived, 0);
   assert.equal(s.ahead, s.total - 1);
-  assert.equal(s.percent, 0);
 });
 
 test('lifeStats mid-life', () => {
@@ -122,7 +121,6 @@ test('lifeStats past the end of the span counts every week lived, with none ahea
   assert.equal(s.lived, s.nowIndex);
   assert.ok(s.lived > s.total);
   assert.equal(s.ahead, 0);
-  assert.equal(s.percent, 100);
   // The grid runs on just far enough to show this week.
   assert.equal(s.shown, s.nowIndex + 1);
   assert.equal(s.rows, 107);
