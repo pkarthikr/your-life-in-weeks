@@ -81,6 +81,17 @@ export function addEvent(events, date, label, color) {
   return [...events, { id: nextId(events), date, label: String(label).trim(), color: colorOrDefault(color) }];
 }
 
+/**
+ * A copy of `events` with the one with this id changed to the new date,
+ * label and color, in the same place and under the same id. An id that isn't
+ * in the list changes nothing.
+ */
+export function updateEvent(events, id, date, label, color) {
+  return events.map((e) =>
+    e.id === id ? { id, date, label: String(label).trim(), color: colorOrDefault(color) } : e,
+  );
+}
+
 /** A copy of `events` without the one with this id. */
 export function removeEvent(events, id) {
   return events.filter((e) => e.id !== id);
@@ -96,6 +107,17 @@ export function addChapter(chapters, start, end, label, color) {
     ...chapters,
     { id: nextId(chapters), start, end: end || '', label: String(label).trim(), color: colorOrDefault(color) },
   ];
+}
+
+/**
+ * A copy of `chapters` with the one with this id changed, in the same place
+ * and under the same id. `end` is '' (or left out) for one that is still
+ * going. An id that isn't in the list changes nothing.
+ */
+export function updateChapter(chapters, id, start, end, label, color) {
+  return chapters.map((c) =>
+    c.id === id ? { id, start, end: end || '', label: String(label).trim(), color: colorOrDefault(color) } : c,
+  );
 }
 
 /** A copy of `chapters` without the one with this id. */

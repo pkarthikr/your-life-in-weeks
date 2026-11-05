@@ -77,11 +77,7 @@
         <span class="leg"><span class="lg lg-lived"></span>Lived</span>
         <span class="leg"><span class="lg lg-ahead"></span>Ahead</span>
         <span class="leg"><span class="lg lg-now"></span>This week</span>
-        <span class="leg"><span class="lg lg-born"></span>Born</span>
-        <span class="leg" id="legend-events" hidden><span class="lg-set" id="legend-colors"></span>Important week · hover for details</span>
       </div>
-      <!-- One entry per chapter on the grid, in date order, added by app.js. -->
-      <ul class="legend legend-chapters" id="legend-chapters" aria-label="Chapters" hidden></ul>
       <div class="row"><span class="yl"></span><div class="cells" id="axis"></div></div>
       <div class="rows" id="rows" role="img">
         <div class="pop" id="pop" hidden>
@@ -148,7 +144,8 @@
           <!-- One radio per color in js/colors.js, added by app.js. -->
           <div class="swatches" id="chapter-colors"></div>
         </fieldset>
-        <button type="submit" class="btn">Add</button>
+        <button type="submit" class="btn" id="chapter-submit">Add</button>
+        <button type="button" class="btn btn-2" id="chapter-cancel" hidden>Cancel</button>
       </form>
       <p class="err" id="chapter-error" role="alert" hidden></p>
       <ul class="list" id="chapter-list" hidden></ul>
@@ -174,7 +171,8 @@
           <!-- One radio per color in js/colors.js, added by app.js. -->
           <div class="swatches" id="event-colors"></div>
         </fieldset>
-        <button type="submit" class="btn">Add</button>
+        <button type="submit" class="btn" id="event-submit">Add</button>
+        <button type="button" class="btn btn-2" id="event-cancel" hidden>Cancel</button>
       </form>
       <p class="err" id="event-error" role="alert" hidden></p>
       <ul class="list" id="event-list" hidden></ul>
@@ -294,7 +292,8 @@
         <span class="li-label"></span>
         <span class="li-meta"></span>
       </div>
-      <button type="button" class="x"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+      <button type="button" class="x x-edit" data-edit><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 13.5l.7-3L11 2.7a1.4 1.4 0 0 1 2 0l.3.3a1.4 1.4 0 0 1 0 2L5.5 12.8z"/><path d="M9.8 3.9l2.3 2.3"/></svg></button>
+      <button type="button" class="x x-remove" data-remove><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
     </li>
   </template>
 

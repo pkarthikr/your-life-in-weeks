@@ -24,7 +24,6 @@ import {
   cellState,
   CHAPTERS_PER_WEEK,
   chaptersByWeek,
-  chapterSpan,
   sortChapters,
   describeChapter,
 } from './weeks.js';
@@ -35,8 +34,10 @@ import {
   chapterError,
   lastCalendarDay,
   addEvent,
+  updateEvent,
   removeEvent,
   addChapter,
+  updateChapter,
   removeChapter,
   nextChapterColor,
 } from './settings.js';
@@ -67,6 +68,8 @@ let currentNowIndex = -1;
 let hoverIndex = null;
 let shownBirthday = null; // the saved birthday last copied into the Settings field
 let askedToKeep = false; // asked the browser to keep the data, this visit
+let editingEvent = null; // id of the important week the form is changing, or null when it adds one
+let editingChapter = null; // the same for chapters
 
 /**
  * Save a change and redraw. The patch is merged into what this page already
@@ -141,9 +144,6 @@ function renderWeeks(birth, today) {
   currentBirth = birth;
   currentToday = today;
   currentNowIndex = stats.nowIndex;
-  $('legend-events').hidden = events.size === 0;
-  renderLegendColors();
-  renderLegendChapters(birth, today);
 
   // Rebuilding 5,200 cells is cheap but not free; only do it when the
   // inputs that shape the grid change. A chapter that is still going grows
@@ -154,34 +154,6 @@ function renderWeeks(birth, today) {
     hidePopover();
     buildGrid(birth, stats.nowIndex);
   }
-}
-
-/** One legend entry per chapter on the grid, in date order: its color and name. */
-function renderLegendChapters(birth, today) {
-  const shown = sortChapters(data.chapters).filter((c) => chapterSpan(birth, c, today, YEARS));
-  $('legend-chapters').replaceChildren(
-    ...shown.map((chapter) => {
-      const item = document.createElement('li');
-      item.className = 'leg';
-      const swatch = document.createElement('span');
-      swatch.className = `lg lg-mark c-${chapter.color}`;
-      item.append(swatch, chapter.label);
-      return item;
-    }),
-  );
-  $('legend-chapters').hidden = shown.length === 0;
-}
-
-/** One legend swatch per color on the grid, in palette order. */
-function renderLegendColors() {
-  const used = new Set([...events.values()].map(weekColor));
-  $('legend-colors').replaceChildren(
-    ...COLORS.filter((c) => used.has(c.id)).map((c) => {
-      const swatch = document.createElement('span');
-      swatch.className = `lg lg-mark c-${c.id}`;
-      return swatch;
-    }),
-  );
 }
 
 function buildAxis() {
@@ -279,6 +251,10 @@ function renderSettings(birth, today) {
   }
   limitChapterEnd();
 
+  // Something removed (or replaced by a restore or another tab) can't be edited.
+  if (editingChapter !== null && !data.chapters.some((c) => c.id === editingChapter)) stopEditingChapter();
+  if (editingEvent !== null && !data.events.some((e) => e.id === editingEvent)) stopEditingEvent();
+
   const sortedChapters = sortChapters(data.chapters);
   $('chapter-list').replaceChildren(...sortedChapters.map((chapter) => chapterItem(chapter, birth, today)));
   $('chapter-list').hidden = sortedChapters.length === 0;
@@ -298,13 +274,16 @@ function renderSettings(birth, today) {
   $('backup-empty').hidden = hasData(data);
 }
 
-/** One row of a list in Settings: a swatch, a label, a line under it and a remove button. */
+/** One row of a list in Settings: a swatch, a label, a line under it, and edit and remove buttons. */
 function listItem({ id, color, label, meta }) {
   const item = $('list-item').content.firstElementChild.cloneNode(true);
   item.querySelector('.lg').classList.add(`c-${color}`);
   item.querySelector('.li-label').textContent = label;
   item.querySelector('.li-meta').textContent = meta;
-  const remove = item.querySelector('.x');
+  const edit = item.querySelector('[data-edit]');
+  edit.dataset.edit = String(id);
+  edit.setAttribute('aria-label', `Edit ${label}`);
+  const remove = item.querySelector('[data-remove]');
   remove.dataset.remove = String(id);
   remove.setAttribute('aria-label', `Remove ${label}`);
   return item;
@@ -492,15 +471,56 @@ $('chapter-form').addEventListener('submit', (e) => {
     $(CHAPTER_FIELDS[problem.field]).focus();
     return;
   }
-  const next = addChapter(data.chapters, start.value, end.value, label.value, chosenColor('chapter-color'));
+  const color = chosenColor('chapter-color');
+  const next =
+    editingChapter === null
+      ? addChapter(data.chapters, start.value, end.value, label.value, color)
+      : updateChapter(data.chapters, editingChapter, start.value, end.value, label.value, color);
   update({ chapters: next });
-  start.value = '';
-  end.value = '';
-  label.value = '';
+  stopEditingChapter();
   // Offer the color the fewest chapters have, so the next one stands apart.
   pickColor('chapter-color', nextChapterColor(next));
   limitChapterEnd();
   start.focus();
+});
+
+/** Put a chapter in the form to change it. */
+function editChapter(chapter) {
+  editingChapter = chapter.id;
+  $('chapter-start').value = chapter.start;
+  $('chapter-end').value = chapter.end;
+  $('chapter-label').value = chapter.label;
+  pickColor('chapter-color', chapter.color);
+  limitChapterEnd();
+  showChapterError(null);
+  $('chapter-submit').textContent = 'Save';
+  $('chapter-cancel').hidden = false;
+  $('chapter-form').scrollIntoView({ block: 'center' });
+  $('chapter-label').focus();
+}
+
+/** Back to adding a new chapter, with the form empty. */
+function stopEditingChapter() {
+  editingChapter = null;
+  $('chapter-start').value = '';
+  $('chapter-end').value = '';
+  $('chapter-label').value = '';
+  showChapterError(null);
+  $('chapter-submit').textContent = 'Add';
+  $('chapter-cancel').hidden = true;
+}
+
+$('chapter-cancel').addEventListener('click', () => {
+  stopEditingChapter();
+  pickColor('chapter-color', nextChapterColor(data.chapters));
+  limitChapterEnd();
+  $('chapter-start').focus();
+});
+
+$('chapter-list').addEventListener('click', (e) => {
+  const button = e.target.closest('[data-edit]');
+  const chapter = button && data.chapters.find((c) => c.id === Number(button.dataset.edit));
+  if (chapter) editChapter(chapter);
 });
 
 for (const id of ['chapter-start', 'chapter-end', 'chapter-label']) {
@@ -531,10 +551,49 @@ $('event-form').addEventListener('submit', (e) => {
     return;
   }
   // The color stays as picked, so several weeks of one kind are quick to add.
-  update({ events: addEvent(data.events, date.value, label.value, chosenColor('event-color')) });
-  date.value = '';
-  label.value = '';
+  const color = chosenColor('event-color');
+  update({
+    events:
+      editingEvent === null
+        ? addEvent(data.events, date.value, label.value, color)
+        : updateEvent(data.events, editingEvent, date.value, label.value, color),
+  });
+  stopEditingEvent();
   date.focus();
+});
+
+/** Put an important week in the form to change it. */
+function editEvent(event) {
+  editingEvent = event.id;
+  $('event-date').value = event.date;
+  $('event-label').value = event.label;
+  pickColor('event-color', event.color);
+  showEventError(null);
+  $('event-submit').textContent = 'Save';
+  $('event-cancel').hidden = false;
+  $('event-form').scrollIntoView({ block: 'center' });
+  $('event-label').focus();
+}
+
+/** Back to adding a new important week, with the form empty. */
+function stopEditingEvent() {
+  editingEvent = null;
+  $('event-date').value = '';
+  $('event-label').value = '';
+  showEventError(null);
+  $('event-submit').textContent = 'Add';
+  $('event-cancel').hidden = true;
+}
+
+$('event-cancel').addEventListener('click', () => {
+  stopEditingEvent();
+  $('event-date').focus();
+});
+
+$('event-list').addEventListener('click', (e) => {
+  const button = e.target.closest('[data-edit]');
+  const event = button && data.events.find((x) => x.id === Number(button.dataset.edit));
+  if (event) editEvent(event);
 });
 
 $('event-date').addEventListener('input', () => showEventError(null));
@@ -832,8 +891,8 @@ window.addEventListener('hashchange', () => {
   if ($('restore-dialog').open) $('restore-dialog').close();
   hidePopover();
   showBirthdayError('');
-  showChapterError(null);
-  showEventError(null);
+  stopEditingChapter();
+  stopEditingEvent();
   setBackupStatus('');
   showRestoreError('');
   shownBirthday = null; // show what is saved, not a half-typed date
