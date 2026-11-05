@@ -2,7 +2,8 @@
 //
 // Runs entirely in the browser. The birthday, important weeks and theme are
 // read from (and written to) localStorage only; see storage.js. Nothing is
-// sent anywhere.
+// sent anywhere. A backup file (backup.js) is the only way they leave the
+// browser, and only when the person downloads one.
 //
 // Both screens live on this one page. The address picks which one shows:
 // `#settings` for Settings, anything else for the weeks.
@@ -22,10 +23,11 @@ import {
   sortEvents,
   cellState,
 } from './weeks.js';
-import { STORAGE_KEY, load, save } from './storage.js';
+import { STORAGE_KEY, load, save, askToKeep } from './storage.js';
 import { birthdayError, eventError, lastCalendarDay, addEvent, removeEvent } from './settings.js';
 import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
 import { FORMATS, PICTURE_FONTS, drawPicture, pictureColors, pictureText, siteAddress } from './picture.js';
+import { hasData, backupFile, sizeError, readBackup, summary, exportedOn } from './backup.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -45,6 +47,7 @@ let events = new Map();
 let currentBirth = null;
 let hoverIndex = null;
 let shownBirthday = null; // the saved birthday last copied into the Settings field
+let askedToKeep = false; // asked the browser to keep the data, this visit
 
 /**
  * Save a change and redraw. The patch is merged into what this page already
@@ -53,6 +56,18 @@ let shownBirthday = null; // the saved birthday last copied into the Settings fi
 function update(patch) {
   data = save({ ...data, ...patch });
   render();
+  keepData();
+}
+
+/**
+ * Once there is something to lose, ask the browser not to clear it (see
+ * askToKeep). Once a visit is enough, and it follows a save, so Firefox's
+ * question comes right after the person did something.
+ */
+function keepData() {
+  if (askedToKeep || !hasData(data)) return;
+  askedToKeep = true;
+  askToKeep();
 }
 
 function currentScreen() {
@@ -215,6 +230,10 @@ function renderSettings(birth, today) {
   // A picture needs a birthday to draw from.
   for (const button of $('share-formats').querySelectorAll('[data-format]')) button.disabled = !birth;
   $('share-needs-birthday').hidden = Boolean(birth);
+
+  // A backup needs something in it. Restoring works any time.
+  $('backup-save').disabled = !hasData(data);
+  $('backup-empty').hidden = hasData(data);
 }
 
 function eventItem(event, birth) {
@@ -530,21 +549,133 @@ $('share-send').addEventListener('click', async () => {
   }
 });
 
+// ---- Backup and restore ----------------------------------------------------
+//
+// Download backup saves everything as a JSON file (js/backup.js). Restore
+// reads one back, from Settings or from the first screen, where someone on a
+// new device (or whose browser cleared the site) lands. The file only ever
+// goes between the browser and the person; nothing is uploaded.
+
+let restoreOpener = null; // the Restore button that was pressed
+let pendingRestore = null; // the backup the dialog is asking about
+
+function setBackupStatus(message) {
+  $('backup-status').textContent = message;
+  $('backup-status').hidden = !message;
+}
+
+/** On whichever screen the restore was started from. */
+function showRestoreError(message) {
+  for (const id of ['backup-error', 'setup-error']) {
+    $(id).textContent = message;
+    $(id).hidden = !message;
+  }
+}
+
+$('backup-save').addEventListener('click', () => {
+  showRestoreError('');
+  const { name, text } = backupFile(data, startOfToday());
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Give the download time to start before letting go of the file.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  // The browser may still ask where to save it, so don't claim it is saved.
+  setBackupStatus(`Downloading ${name}. Keep it somewhere outside this browser, like a cloud drive or an email to yourself.`);
+  keepData();
+});
+
+for (const button of document.querySelectorAll('[data-restore]')) {
+  button.addEventListener('click', () => {
+    restoreOpener = button;
+    setBackupStatus('');
+    showRestoreError('');
+    $('restore-file').value = ''; // so picking the same file again still counts
+    $('restore-file').click();
+  });
+}
+
+$('restore-file').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const tooBig = sizeError(file.size);
+  if (tooBig) return showRestoreError(tooBig);
+
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    return showRestoreError('Couldn’t read that file. Try again.');
+  }
+  const backup = readBackup(text);
+  if (backup.error) return showRestoreError(backup.error);
+
+  // Nothing here to lose: restore straight away. Otherwise check first.
+  if (hasData(data)) askBeforeRestoring(backup);
+  else restore(backup);
+});
+
+function askBeforeRestoring(backup) {
+  pendingRestore = backup;
+  const on = exportedOn(backup.exported);
+  $('restore-from').textContent = on ? `The backup, from ${on}` : 'The backup';
+  $('restore-new').textContent = summary(backup.data);
+  $('restore-old').textContent = summary(data);
+  $('restore-dialog').returnValue = ''; // only Replace sets it
+  $('restore-dialog').showModal();
+}
+
+$('restore-dialog').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.close();
+});
+
+$('restore-dialog').addEventListener('close', () => {
+  const backup = pendingRestore;
+  pendingRestore = null;
+  if (backup && $('restore-dialog').returnValue === 'replace') restore(backup);
+  else focusAfterRestore();
+});
+
+function restore({ data: restored, exported }) {
+  update(restored);
+  const on = exportedOn(exported);
+  setBackupStatus(`Restored your backup${on ? ` from ${on}` : ''}: ${summary(data)}.`);
+  focusAfterRestore();
+}
+
+/** Back to the Restore button, or, if restoring moved on from its screen, to the new one's heading. */
+function focusAfterRestore() {
+  const opener = restoreOpener;
+  restoreOpener = null;
+  if (opener?.isConnected && !opener.closest('[hidden]')) opener.focus();
+  else focusHeading();
+}
+
 // ---- Switching screens -----------------------------------------------------
 
-window.addEventListener('hashchange', () => {
-  if ($('share-dialog').open) $('share-dialog').close();
-  hidePopover();
-  showBirthdayError('');
-  showEventError(null);
-  shownBirthday = null; // show what is saved, not a half-typed date
-  render();
-  window.scrollTo(0, 0);
-
+function focusHeading() {
   const screen = currentScreen();
   const heading =
     screen === 'settings' ? 'settings-title' : $('weeks-view').hidden ? 'setup-title' : 'weeks-title';
   $(heading).focus({ preventScroll: true });
+}
+
+window.addEventListener('hashchange', () => {
+  if ($('share-dialog').open) $('share-dialog').close();
+  if ($('restore-dialog').open) $('restore-dialog').close();
+  hidePopover();
+  showBirthdayError('');
+  showEventError(null);
+  setBackupStatus('');
+  showRestoreError('');
+  shownBirthday = null; // show what is saved, not a half-typed date
+  render();
+  window.scrollTo(0, 0);
+  focusHeading();
 });
 
 // ---- Keep in sync ----------------------------------------------------------

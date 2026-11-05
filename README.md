@@ -9,8 +9,9 @@ Inspired by Tim Urban's [Your Life in Weeks](https://waitbutwhy.com/2014/05/life
 Life in Weeks is a static web page. There is no server, no database and no account.
 
 - Everything runs in your browser.
-- Your birthday, your important weeks and your theme are saved in your browser's `localStorage` under the key `liw:v1`. They never leave your device.
-- A different browser or device starts fresh. Clearing this site's data in your browser deletes everything.
+- Your birthday, your important weeks and your theme are saved in your browser's `localStorage` under the key `liw:v1`. They never leave your device unless you download a backup.
+- A different browser or device starts fresh. Clearing this site's data in your browser deletes everything. Some browsers clear it for you: Safari deletes a site's saved data after seven days of use without a visit.
+- So Settings → **Backup** can download everything as a JSON file, and restore it in any browser, on any device. The file goes from your browser to you and back; nothing is uploaded. See [Backups](#backups).
 - The share pictures (Settings → **Share your weeks**) are drawn in your browser too. Nothing is uploaded; you save or share the picture yourself.
 
 The only network requests are for the page's own files. That includes the Geist fonts, which are served with the site rather than from Google Fonts, and the author's photo in Settings → **About**, which is copied from Gravatar when the site is deployed (see below) so your browser never contacts Gravatar.
@@ -29,7 +30,7 @@ That runs `python3 -m http.server 8000 --directory site`. Then open http://local
 
 ## Tests
 
-The date math, the Settings rules, the share pictures' layout and drawing, the storage layer and the link-preview tags have unit tests that use Node's built-in test runner (Node 20 or later):
+The date math, the Settings rules, the share pictures' layout and drawing, the storage layer, the backup files and the link-preview tags have unit tests that use Node's built-in test runner (Node 20 or later):
 
 ```bash
 npm test
@@ -60,7 +61,8 @@ site/            the whole app, served as-is
   js/colors.js   the colors an important week can have (their shades are in styles.css)
   js/settings.js pure rules for Settings: checking dates, adding and removing important weeks
   js/picture.js  the share pictures: their formats, layout and canvas drawing (no DOM)
-  js/storage.js  localStorage read/write
+  js/storage.js  localStorage read/write, and asking the browser to keep it
+  js/backup.js   backup files: writing them and checking them before a restore (no DOM)
 scripts/
   link-preview.mjs  draws site/link-preview.png (needs Playwright)
 test/            unit tests (node --test)
@@ -70,9 +72,10 @@ test/            unit tests (node --test)
 
 Both screens are on one page; the address picks which one shows, so the browser's back button and reload work as expected.
 
-- **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks show in the color you picked for them; hover one for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. If it is also an important week, it keeps that week's color inside the ring. Before a birthday is saved, it asks you to add one.
+- **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks show in the color you picked for them; hover one for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. If it is also an important week, it keeps that week's color inside the ring. Before a birthday is saved, it asks you to add one, or to restore a backup (the way in on a new device, or after the browser cleared the site).
 - **Settings** (`#settings`): your birthday, the light or dark theme, and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
   - **Share your weeks** makes a PNG of your whole grid in your current theme, sized for where you'll post it. Save it, or, where the browser supports sharing files (most phones), share it straight to the app. It needs a birthday first.
+  - **Backup** downloads everything as a file, or restores one. See below.
   - **About** is a short note on who made the site, with a link to the author's blog, and a link to Tim Urban's original [Your Life in Weeks](https://waitbutwhy.com/2014/05/life-weeks.html) post on Wait But Why. The name, line about the author and blog link are in `index.html`; the photo's Gravatar hash is in `.github/workflows/pages.yml`.
 
 ### Share pictures
@@ -87,6 +90,29 @@ Both screens are on one page; the address picks which one shows, so the browser'
 Each picture has the weeks lived and ahead, the grid with ages every ten years, a legend and the site's address, so friends can make their own. The grid fills the picture's width, so weeks can come out wider than they are tall. Important weeks show in their colors but their labels are left off, since the picture is meant to be posted; the week you were born is ringed, as on the page. The story keeps its text clear of the top and bottom, where Instagram draws the poster's name and the reply bar.
 
 To add a format, add an entry to `FORMATS` in `js/picture.js` (its size, margins, type sizes and which way the grid runs); its button and layout follow from that.
+
+### Backups
+
+**Download backup** saves `life-in-weeks-backup-YYYY-MM-DD.json`: your birthday, theme and important weeks, as readable JSON.
+
+```json
+{
+  "app": "life-in-weeks",
+  "version": 1,
+  "exported": "2026-11-05",
+  "birthday": "1990-06-15",
+  "theme": "dark",
+  "events": [
+    { "id": 1, "date": "2015-03-02", "label": "Moved to Seattle", "color": "teal" }
+  ]
+}
+```
+
+**Restore backup** reads one back and puts it in place of what this browser holds. If the browser already has a birthday or important weeks, it first shows both side by side and asks before replacing them. A file that isn't a backup, has a broken birthday, or holds nothing is turned away without changing anything. A malformed important week is dropped, as it would be on a normal load. A backup from a newer version of the app asks you to reload the page.
+
+When you first save something on a visit, the app also calls `navigator.storage.persist()`, which asks the browser not to clear the site's data. It is only a request. Firefox asks you. Chrome and Safari decide for themselves from how you use the site, and Safari mostly agrees only for sites added to the Home Screen. That's why the backup file, not `persist()`, is the dependable copy. It is asked when you save rather than when the page loads, so Firefox's question follows something you did.
+
+To change the file's shape, bump `BACKUP_VERSION` in `js/backup.js`, and keep `readBackup` reading the older versions.
 
 ### Link previews
 
