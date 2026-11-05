@@ -736,6 +736,52 @@ a { color: inherit; }
 
 .dlg-actions .btn { flex: 1 1 0; }
 
+/* A dialog that asks a question has no close button above it, so its
+   content starts lower. */
+.dlg-ask { padding-top: 24px; }
+
+/* ---- Backup ------------------------------------------------------------ */
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Restoring: the backup and what this browser holds now, one above the other. */
+.compare {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compare-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.compare dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.compare dd {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+@media (max-width: 520px) {
+  /* Side by side when they fit, else one per line, full width. */
+  .backup-actions .btn { flex: 1 1 auto; }
+}
+
 /* Phones: keep the three stats on one line and the tiny cells square. */
 @media (max-width: 520px) {
   .stats { gap: 20px; }
@@ -764,6 +810,8 @@ a { color: inherit; }
   font-size: 16px;
   color: var(--muted);
 }
+
+.setup .link { font-size: 15px; }
 
 /* ---- Settings ---------------------------------------------------------- */
 
@@ -1109,6 +1157,11 @@ a { color: inherit; }
 }
 
 .btn:hover { opacity: .88; }
+
+.btn:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
 
 /* Secondary: outlined, like the selected tab. */
 .btn-2 {

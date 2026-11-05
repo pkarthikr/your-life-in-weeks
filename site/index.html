@@ -96,6 +96,8 @@
     <h1 class="title title-sm" id="setup-title" tabindex="-1">Every square is a week.</h1>
     <p class="setup-sub">Add your birthday to see yours.</p>
     <a class="btn" href="#settings">Add birthday</a>
+    <button type="button" class="link" data-restore>Or restore a backup</button>
+    <p class="err" id="setup-error" role="alert" hidden></p>
     <p class="note">Saved only in this browser. Nothing is sent anywhere.</p>
   </div>
 
@@ -156,6 +158,20 @@
       <p class="lab" id="share-needs-birthday" hidden>Add your birthday first.</p>
     </section>
 
+    <section class="card" aria-labelledby="s-backup">
+      <div class="card-head">
+        <h2 id="s-backup" class="h2">Backup</h2>
+        <p class="lab">Your weeks are saved only in this browser, and some browsers clear a site’s data if you don’t visit for a while. Download a backup file to keep a copy, or to move your weeks to another device.</p>
+      </div>
+      <div class="backup-actions">
+        <button type="button" class="btn" id="backup-save">Download backup</button>
+        <button type="button" class="btn btn-2" data-restore>Restore backup</button>
+      </div>
+      <p class="lab" id="backup-empty" hidden>Nothing to back up yet.</p>
+      <p class="lab" id="backup-status" role="status" hidden></p>
+      <p class="err" id="backup-error" role="alert" hidden></p>
+    </section>
+
     <!-- About: who made this, and where the idea comes from. The photo is
          the author's Gravatar, copied into the site when it is deployed
          (see .github/workflows/pages.yml), so the page still loads nothing
@@ -201,6 +217,32 @@
       </div>
       <p class="err" id="share-error" role="alert" hidden></p>
     </div>
+  </dialog>
+
+  <!-- Restore: picks a backup file (js/backup.js). Read in the browser;
+       nothing is uploaded. Both "Restore" buttons open this one picker. -->
+  <input type="file" id="restore-file" accept=".json,application/json" hidden>
+
+  <!-- Shown before a backup replaces what this browser already holds. -->
+  <dialog id="restore-dialog" class="dlg" aria-labelledby="restore-title" aria-describedby="restore-note">
+    <form method="dialog" class="dlg-in dlg-ask">
+      <h2 id="restore-title" class="h2">Replace what’s in this browser?</h2>
+      <dl class="compare">
+        <div class="compare-row">
+          <dt id="restore-from">The backup</dt>
+          <dd id="restore-new"></dd>
+        </div>
+        <div class="compare-row">
+          <dt>In this browser now</dt>
+          <dd id="restore-old"></dd>
+        </div>
+      </dl>
+      <p class="note" id="restore-note">The backup’s birthday, important weeks and theme take the place of what’s here now. To keep what’s here, cancel and download a backup of it first.</p>
+      <div class="dlg-actions">
+        <button class="btn btn-2" value="cancel">Cancel</button>
+        <button class="btn" value="replace">Replace</button>
+      </div>
+    </form>
   </dialog>
 
   <template id="event-item">
