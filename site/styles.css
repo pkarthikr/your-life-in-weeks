@@ -1115,16 +1115,16 @@ a { color: inherit; }
 }
 
 .me-bio {
-  margin: 0;
+  margin: 14px 0 0;
   font-size: 14px;
+  line-height: 1.5;
   color: var(--muted);
 }
 
-/* Tall enough to tap, without spacing the lines apart. */
-.me-blog {
-  font-size: 14px;
-  padding: 4px 0;
-  margin: -2px 0 -4px;
+/* Written as me[at]… so it is not an easy catch for address harvesters. */
+.me-mail {
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .credit {
