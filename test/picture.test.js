@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { YEARS, WEEKS_PER_YEAR, BIRTH_WEEK, parseISODate, lifeStats, eventsByWeek } from '../site/js/weeks.js';
-import { FORMATS, pictureLayout, cellBox, pictureText, siteAddress, drawPicture } from '../site/js/picture.js';
+import { FORMATS, PREVIEW, pictureLayout, cellBox, pictureText, pictureColors, siteAddress, drawPicture } from '../site/js/picture.js';
 import { COLORS as PALETTE } from '../site/js/colors.js';
 
 const d = (s) => parseISODate(s);
@@ -26,7 +26,7 @@ test('the formats: Instagram story and post, LinkedIn and X', () => {
   for (const id of ['post', 'linkedin', 'x']) assert.equal(FORMATS[id].years, 'columns');
 });
 
-for (const format of ALL) {
+for (const format of [...ALL, PREVIEW]) {
   for (const footer of [true, false]) {
     test(`${format.id}: everything sits inside the margins, in order (footer: ${footer})`, () => {
       const layout = pictureLayout(format, { footer });
@@ -48,7 +48,9 @@ for (const format of ALL) {
       if (footer && format.footerBeside) assert.equal(layout.footer.y, layout.legend.y, 'address on the legend line');
     });
   }
+}
 
+for (const format of ALL) {
   test(`${format.id}: whole-pixel weeks that fill the width, with a gap between every pair`, () => {
     const { grid } = pictureLayout(format);
     const [cols, rows] = format.years === 'columns' ? [YEARS, WEEKS_PER_YEAR] : [WEEKS_PER_YEAR, YEARS];
@@ -64,6 +66,19 @@ for (const format of ALL) {
     assert.ok(grid.width <= room && room - grid.width < grid.cols, `${grid.width} of ${room}px`);
   });
 }
+
+test('the link preview is 1200 × 630, has no Share button, and its weeks fill the width', () => {
+  assert.deepEqual([PREVIEW.width, PREVIEW.height], [1200, 630]); // 1.91:1
+  assert.ok(!Object.values(FORMATS).includes(PREVIEW));
+  assert.equal(PREVIEW.years, 'columns');
+  const { grid } = pictureLayout(PREVIEW);
+  assert.deepEqual([grid.cols, grid.rows], [YEARS, WEEKS_PER_YEAR]);
+  // 52 weeks in 630 pixels, under the title, leave them short; they stay
+  // whole pixels, apart, and no narrower than they are tall.
+  assert.deepEqual([grid.cellW, grid.cellH, grid.colGap, grid.rowGap], [9, 5, 1, 1]);
+  const room = PREVIEW.width - 2 * PREVIEW.margin.side;
+  assert.ok(grid.width <= room && room - grid.width < grid.cols, `${grid.width} of ${room}px`);
+});
 
 test('the story keeps the weeks it was approved with: 16 × 10 with 2px gaps', () => {
   const { grid } = pictureLayout(FORMATS.story);
@@ -110,6 +125,20 @@ test('pictureText says "week" for one', () => {
   assert.equal(text.lived, '1 week lived.');
   assert.equal(text.ahead, '1 week ahead.');
   assert.equal(pictureText({ lived: 0, ahead: 5199 }).lived, '0 weeks lived.');
+});
+
+test('pictureColors reads each theme token, the important-week shades and the halo', () => {
+  const tokens = {
+    bg: '#000', text: '#fff', ink: '#eee', muted: '#999', future: '#222', now: '#fb4', nowA: 'rgba(1,2,3,.5)', halo: '25%',
+    ...Object.fromEntries(PALETTE.map((c) => [`c-${c.id}`, `#${c.id}`])),
+  };
+  const colors = pictureColors((name) => tokens[name] ?? '');
+  assert.deepEqual(colors, {
+    bg: '#000', text: '#fff', ink: '#eee', muted: '#999', future: '#222', now: '#fb4', nowA: 'rgba(1,2,3,.5)',
+    marks: Object.fromEntries(PALETTE.map((c) => [c.id, `#${c.id}`])),
+    halo: 0.25,
+  });
+  assert.equal(pictureColors(() => '').halo, 0.3, 'a missing halo falls back to 30%');
 });
 
 test('siteAddress is the page address without the protocol, file or hash', () => {
@@ -260,6 +289,27 @@ for (const format of ALL) {
     }
   });
 }
+
+test('drawPicture writes the text it is given in place of the counts', () => {
+  const ctx = fakeContext();
+  const born = d('1990-01-01');
+  drawPicture(ctx, {
+    format: PREVIEW,
+    stats: lifeStats(born, d('2026-11-04')),
+    events: eventsByWeek(born, []),
+    colors: COLORS,
+    site: 'example.com/weeks',
+    text: { eyebrow: 'Life in Weeks', lived: 'Every square is a week.', ahead: 'See yours.' },
+  });
+  const texts = ctx.calls.filter((c) => c.op === 'text');
+  const words = texts.map((c) => c.text);
+  assert.ok(words.includes('LIFE IN WEEKS'));
+  const first = texts.find((c) => c.text === 'Every square is a week.');
+  const second = texts.find((c) => c.text === 'See yours.');
+  assert.deepEqual([first.color, second.color], ['TEXT', 'MUTED']);
+  assert.equal(first.y, second.y, 'one line, as the format says');
+  assert.ok(!words.some((t) => /weeks (lived|ahead)/.test(t)));
+});
 
 test('the X picture puts lived and ahead on one line, and the address beside the legend', () => {
   const { textCalls, layout } = draw('1990-01-01', '2026-11-04', [], 'example.github.io/weeks', FORMATS.x);

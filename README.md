@@ -29,7 +29,7 @@ That runs `python3 -m http.server 8000 --directory site`. Then open http://local
 
 ## Tests
 
-The date math, the Settings rules, the share pictures' layout and drawing, and the storage layer have unit tests that use Node's built-in test runner (Node 20 or later):
+The date math, the Settings rules, the share pictures' layout and drawing, the storage layer and the link-preview tags have unit tests that use Node's built-in test runner (Node 20 or later):
 
 ```bash
 npm test
@@ -41,7 +41,9 @@ npm test
 
 Before uploading `site/`, the deploy copies the author's Gravatar into it as `site/me.jpg`. The workflow holds the SHA-256 hash Gravatar looks the picture up by, not the email address. If the download fails, the deploy still goes ahead and the About card shows initials instead; it does the same when you run the site locally, since `me.jpg` isn't in the repository.
 
-One-time setup: in the repository on GitHub, go to **Settings → Pages**. Under **Build and deployment**, set **Source** to **GitHub Actions**. Then push to the default branch, or run the workflow by hand from the **Actions** tab. The site appears at `https://<owner>.github.io/<repo>/`.
+One-time setup: in the repository on GitHub, go to **Settings → Pages**. Under **Build and deployment**, set **Source** to **GitHub Actions**. Then push to the default branch, or run the workflow by hand from the **Actions** tab. The site appears at `https://<owner>.github.io/<repo>/`, or under your custom domain if you have one.
+
+The link-preview tags in `index.html` name the site's address in full (link previews need absolute addresses). If you deploy it somewhere else, see [Link previews](#link-previews).
 
 ## Project layout
 
@@ -51,6 +53,7 @@ site/            the whole app, served as-is
   styles.css     styles and the light and dark theme tokens
   favicon.svg
   me.jpg         the author's photo, added by the deploy (not in the repository)
+  link-preview.png  the picture link previews show, drawn by scripts/link-preview.mjs
   fonts/         Geist and Geist Mono (woff2), with their license in OFL.txt
   js/app.js      rendering and events for the Weeks and Settings screens
   js/weeks.js    pure date math for the grid (no DOM)
@@ -58,6 +61,8 @@ site/            the whole app, served as-is
   js/settings.js pure rules for Settings: checking dates, adding and removing important weeks
   js/picture.js  the share pictures: their formats, layout and canvas drawing (no DOM)
   js/storage.js  localStorage read/write
+scripts/
+  link-preview.mjs  draws site/link-preview.png (needs Playwright)
 test/            unit tests (node --test)
 ```
 
@@ -82,6 +87,21 @@ Both screens are on one page; the address picks which one shows, so the browser'
 Each picture has the weeks lived and ahead, the grid with ages every ten years, a legend and the site's address, so friends can make their own. The grid fills the picture's width, so weeks can come out wider than they are tall. Important weeks show in their colors but their labels are left off, since the picture is meant to be posted; the week you were born is ringed, as on the page. The story keeps its text clear of the top and bottom, where Instagram draws the poster's name and the reply bar.
 
 To add a format, add an entry to `FORMATS` in `js/picture.js` (its size, margins, type sizes and which way the grid runs); its button and layout follow from that.
+
+### Link previews
+
+When someone posts the site's address, apps like X, LinkedIn, Slack, WhatsApp and iMessage show a card with a picture. The page's Open Graph and `twitter:card` tags in `index.html` point them at `site/link-preview.png`: a sample life on the week grid, 1200 × 630, in the dark theme, with "Every square is a week. See yours." over it.
+
+It is a fixed file, drawn by the same code as the share pictures (the `PREVIEW` format in `js/picture.js`, which has no Share button). Redraw it after changing how the pictures look, the dark theme's colors or the site's address:
+
+```bash
+npm install --no-save playwright && npx playwright install chromium   # once
+npm run link-preview
+```
+
+The tags must give the site's full address: `og:url` is `https://pkarthikr.in/your-life-in-weeks/` and `og:image` is the picture under it. If the site moves, or you deploy a copy of it, change both, then run `npm run link-preview` so the address printed on the picture matches. A test checks that the tags are there, that the picture is under `og:url`, and that its size matches the tags.
+
+Apps keep a copy of a preview for a while. To see a change straight away, ask for a fresh one with a tool like LinkedIn's Post Inspector or Facebook's Sharing Debugger.
 
 ### Colors for important weeks
 
