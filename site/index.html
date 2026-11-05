@@ -5,6 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Life in Weeks</title>
 <meta name="description" content="Your whole life on one page, one square per week. Runs entirely in your browser — your birthday, chapters and important weeks are saved only on this device.">
+<!-- Link previews. Their addresses must be absolute; if the site moves,
+     change og:url and og:image, then run `npm run link-preview` so the
+     picture prints the new address. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Life in Weeks">
+<meta property="og:title" content="Life in Weeks">
+<meta property="og:description" content="Your whole life on one page, one square per week. Runs entirely in your browser — your birthday, chapters and important weeks are saved only on this device.">
+<meta property="og:url" content="https://pkarthikr.in/your-life-in-weeks/">
+<meta property="og:image" content="https://pkarthikr.in/your-life-in-weeks/link-preview.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Life in Weeks grid for a sample life: 100 years as 5,200 small squares, one per week, with the weeks lived filled in and a few important weeks in color.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image:alt" content="The Life in Weeks grid for a sample life: 100 years as 5,200 small squares, one per week, with the weeks lived filled in and a few important weeks in color.">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/geist-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/geist-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -84,6 +99,8 @@
     <h1 class="title title-sm" id="setup-title" tabindex="-1">Every square is a week.</h1>
     <p class="setup-sub">Add your birthday to see yours.</p>
     <a class="btn" href="#settings">Add birthday</a>
+    <button type="button" class="link" data-restore>Or restore a backup</button>
+    <p class="err" id="setup-error" role="alert" hidden></p>
     <p class="note">Saved only in this browser. Nothing is sent anywhere.</p>
   </div>
 
@@ -174,6 +191,40 @@
       <p class="lab" id="share-needs-birthday" hidden>Add your birthday first.</p>
     </section>
 
+    <section class="card" aria-labelledby="s-backup">
+      <div class="card-head">
+        <h2 id="s-backup" class="h2">Backup</h2>
+        <p class="lab">Your weeks are saved only in this browser, and some browsers clear a site’s data if you don’t visit for a while. Download a backup file to keep a copy, or to move your weeks to another device.</p>
+      </div>
+      <div class="backup-actions">
+        <button type="button" class="btn" id="backup-save">Download backup</button>
+        <button type="button" class="btn btn-2" data-restore>Restore backup</button>
+      </div>
+      <p class="lab" id="backup-empty" hidden>Nothing to back up yet.</p>
+      <p class="lab" id="backup-status" role="status" hidden></p>
+      <p class="err" id="backup-error" role="alert" hidden></p>
+    </section>
+
+    <!-- About: who made this, and where the idea comes from. The photo is
+         the author's Gravatar, copied into the site when it is deployed
+         (see .github/workflows/pages.yml), so the page still loads nothing
+         from other sites. Without it, the initials underneath show. -->
+    <section class="card" aria-labelledby="s-about">
+      <h2 id="s-about" class="h2">About</h2>
+      <div class="me">
+        <span class="me-pic">
+          <span aria-hidden="true">KR</span>
+          <img id="me-photo" src="me.jpg" alt="" width="56" height="56" decoding="async">
+        </span>
+        <div class="me-text">
+          <p class="me-name">Karthik Ragubathy</p>
+          <p class="me-bio">I work at Amazon in Seattle, and made Life in Weeks on the side.</p>
+          <a class="link me-blog" href="https://pkarthikr.in">Read my blog at pkarthikr.in</a>
+        </div>
+      </div>
+      <p class="credit">Based on Tim Urban's <a class="link" href="https://waitbutwhy.com/2014/05/life-weeks.html">Your Life in Weeks</a> on Wait But Why, where the idea of one square per week comes from.</p>
+    </section>
+
     <div class="settings-foot">
       <p class="note">Everything here is saved only in this browser. Nothing is sent anywhere.</p>
       <a class="btn" href="#weeks">See my weeks</a>
@@ -199,6 +250,32 @@
       </div>
       <p class="err" id="share-error" role="alert" hidden></p>
     </div>
+  </dialog>
+
+  <!-- Restore: picks a backup file (js/backup.js). Read in the browser;
+       nothing is uploaded. Both "Restore" buttons open this one picker. -->
+  <input type="file" id="restore-file" accept=".json,application/json" hidden>
+
+  <!-- Shown before a backup replaces what this browser already holds. -->
+  <dialog id="restore-dialog" class="dlg" aria-labelledby="restore-title" aria-describedby="restore-note">
+    <form method="dialog" class="dlg-in dlg-ask">
+      <h2 id="restore-title" class="h2">Replace what’s in this browser?</h2>
+      <dl class="compare">
+        <div class="compare-row">
+          <dt id="restore-from">The backup</dt>
+          <dd id="restore-new"></dd>
+        </div>
+        <div class="compare-row">
+          <dt>In this browser now</dt>
+          <dd id="restore-old"></dd>
+        </div>
+      </dl>
+      <p class="note" id="restore-note">The backup’s birthday, chapters, important weeks and theme take the place of what’s here now. To keep what’s here, cancel and download a backup of it first.</p>
+      <div class="dlg-actions">
+        <button class="btn btn-2" value="cancel">Cancel</button>
+        <button class="btn" value="replace">Replace</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- A chapter in the week popover. -->

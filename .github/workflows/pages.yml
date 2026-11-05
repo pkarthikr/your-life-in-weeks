@@ -39,6 +39,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/configure-pages@v6
+      # The photo in Settings → About is the author's Gravatar. It is copied
+      # into the site here, so visitors load it from this site and their
+      # browsers never contact Gravatar. If the download fails the deploy
+      # still goes ahead, and the card shows initials instead.
+      - name: Copy the author's Gravatar into the site
+        env:
+          # SHA-256 of the author's email address (trimmed, lowercased), which
+          # is how Gravatar looks a picture up. The address itself stays out
+          # of the repository.
+          GRAVATAR_HASH: 28f88af83f1bb9ce0d624c9d57d4ffaa35fbe47cd648e3f8db7c531684b695e1
+        run: |
+          if curl -fsSL --max-time 30 -o "$RUNNER_TEMP/me.jpg" "https://gravatar.com/avatar/$GRAVATAR_HASH.jpg?s=192&d=404"; then
+            mv "$RUNNER_TEMP/me.jpg" site/me.jpg
+          else
+            echo "::warning::Could not download the Gravatar, so Settings → About shows initials."
+          fi
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

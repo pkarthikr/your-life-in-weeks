@@ -1,6 +1,7 @@
 // Everything the app remembers lives in this browser's localStorage under a
 // single key. There is no server and no account: clearing site data, or
-// opening the app in another browser, starts fresh.
+// opening the app in another browser, starts fresh, unless the person
+// restores a backup file (backup.js).
 
 import { colorOrDefault } from './colors.js';
 
@@ -56,8 +57,8 @@ const cleanChapters = (list) =>
   );
 
 /**
- * Read saved data. Always returns a complete, well-formed object, even when
- * storage is unavailable, empty or holds something unexpected.
+ * The saved shape, made from whatever `saved` holds: what was in storage, or
+ * a backup file (see backup.js). Always complete and well-formed.
  *
  * Shape: {
  *   birthday: 'YYYY-MM-DD' | '',
@@ -68,20 +69,29 @@ const cleanChapters = (list) =>
  * Dates are 'YYYY-MM-DD'. A chapter's `end` is '' while it is still going.
  * `color` is one of the ids in colors.js.
  */
-export function load(store = defaultStore()) {
-  let saved = {};
-  try {
-    saved = JSON.parse(store?.getItem(STORAGE_KEY) ?? '{}') ?? {};
-  } catch {
-    saved = {};
-  }
-  if (typeof saved !== 'object' || Array.isArray(saved)) saved = {};
+export function clean(saved) {
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) saved = {};
   return {
     birthday: typeof saved.birthday === 'string' ? saved.birthday : DEFAULTS.birthday,
     events: cleanEvents(saved.events),
     chapters: cleanChapters(saved.chapters),
     theme: saved.theme === 'light' ? 'light' : DEFAULTS.theme,
   };
+}
+
+/**
+ * Read saved data. Always returns a complete, well-formed object (see
+ * clean), even when storage is unavailable, empty or holds something
+ * unexpected.
+ */
+export function load(store = defaultStore()) {
+  let saved = {};
+  try {
+    saved = JSON.parse(store?.getItem(STORAGE_KEY) ?? '{}');
+  } catch {
+    saved = {};
+  }
+  return clean(saved);
 }
 
 /**
@@ -97,4 +107,26 @@ export function save(patch, store = defaultStore()) {
     // Not persisted; nothing else to do.
   }
   return next;
+}
+
+/**
+ * Ask the browser to keep this site's data, rather than clear it when space
+ * runs low or the site goes unvisited for a while. It is only a request:
+ * Firefox asks the person, while Chrome and Safari decide from how the site
+ * is used (Safari mostly agrees for sites added to the Home Screen). So a
+ * backup file is still the only copy outside the browser.
+ *
+ * Firefox's question should follow something the person did, so call this
+ * when they save something, not when the page loads.
+ *
+ * Resolves to whether the browser has agreed. Never rejects.
+ */
+export async function askToKeep(manager = globalThis.navigator?.storage) {
+  try {
+    if (typeof manager?.persist !== 'function') return false;
+    if (await manager.persisted?.()) return true;
+    return (await manager.persist()) === true;
+  } catch {
+    return false;
+  }
 }

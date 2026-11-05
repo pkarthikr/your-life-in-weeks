@@ -2,7 +2,8 @@
 //
 // Runs entirely in the browser. The birthday, chapters, important weeks and
 // theme are read from (and written to) localStorage only; see storage.js.
-// Nothing is sent anywhere.
+// Nothing is sent anywhere. A backup file (backup.js) is the only way they
+// leave the browser, and only when the person downloads one.
 //
 // Both screens live on this one page. The address picks which one shows:
 // `#settings` for Settings, anything else for the weeks.
@@ -27,7 +28,7 @@ import {
   sortChapters,
   describeChapter,
 } from './weeks.js';
-import { STORAGE_KEY, load, save } from './storage.js';
+import { STORAGE_KEY, load, save, askToKeep } from './storage.js';
 import {
   birthdayError,
   eventError,
@@ -40,7 +41,8 @@ import {
   nextChapterColor,
 } from './settings.js';
 import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
-import { FORMATS, PICTURE_FONTS, drawPicture, pictureText, siteAddress } from './picture.js';
+import { FORMATS, PICTURE_FONTS, drawPicture, pictureColors, pictureText, siteAddress } from './picture.js';
+import { hasData, backupFile, sizeError, readBackup, summary, exportedOn } from './backup.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -64,6 +66,7 @@ let currentToday = null;
 let currentNowIndex = -1;
 let hoverIndex = null;
 let shownBirthday = null; // the saved birthday last copied into the Settings field
+let askedToKeep = false; // asked the browser to keep the data, this visit
 
 /**
  * Save a change and redraw. The patch is merged into what this page already
@@ -72,6 +75,18 @@ let shownBirthday = null; // the saved birthday last copied into the Settings fi
 function update(patch) {
   data = save({ ...data, ...patch });
   render();
+  keepData();
+}
+
+/**
+ * Once there is something to lose, ask the browser not to clear it (see
+ * askToKeep). Once a visit is enough, and it follows a save, so Firefox's
+ * question comes right after the person did something.
+ */
+function keepData() {
+  if (askedToKeep || !hasData(data)) return;
+  askedToKeep = true;
+  askToKeep();
 }
 
 function currentScreen() {
@@ -277,6 +292,10 @@ function renderSettings(birth, today) {
   // A picture needs a birthday to draw from.
   for (const button of $('share-formats').querySelectorAll('[data-format]')) button.disabled = !birth;
   $('share-needs-birthday').hidden = Boolean(birth);
+
+  // A backup needs something in it. Restoring works any time.
+  $('backup-save').disabled = !hasData(data);
+  $('backup-empty').hidden = hasData(data);
 }
 
 /** One row of a list in Settings: a swatch, a label, a line under it and a remove button. */
@@ -530,8 +549,6 @@ handleRemove('event-list', 'events', removeEvent, 'event-date');
 // where the browser can, to share it straight to an app). All of it happens
 // in the browser; nothing is uploaded.
 
-const THEME_COLORS = ['bg', 'text', 'ink', 'muted', 'future', 'now', 'nowA'];
-
 let picture = null; // { url, file } for the picture on show
 let pictureRun = 0; // bumped on every open and close, so a late picture is dropped
 let pictureOpener = null; // the format button that opened the dialog
@@ -557,13 +574,7 @@ function buildFormatButtons() {
 /** The current theme's colours, read from the same tokens the page uses. */
 function themeColors() {
   const css = getComputedStyle(document.documentElement);
-  const token = (name) => css.getPropertyValue(`--${name}`).trim();
-  return {
-    ...Object.fromEntries(THEME_COLORS.map((name) => [name, token(name)])),
-    marks: Object.fromEntries(COLORS.map((c) => [c.id, token(`c-${c.id}`)])),
-    halo: (parseFloat(token('halo')) || 30) / 100,
-    tint: (parseFloat(token('tint')) || 35) / 100,
-  };
+  return pictureColors((name) => css.getPropertyValue(`--${name}`).trim());
 }
 
 async function makePicture(format) {
@@ -699,22 +710,136 @@ $('share-send').addEventListener('click', async () => {
   }
 });
 
+// ---- Backup and restore ----------------------------------------------------
+//
+// Download backup saves everything as a JSON file (js/backup.js). Restore
+// reads one back, from Settings or from the first screen, where someone on a
+// new device (or whose browser cleared the site) lands. The file only ever
+// goes between the browser and the person; nothing is uploaded.
+
+let restoreOpener = null; // the Restore button that was pressed
+let pendingRestore = null; // the backup the dialog is asking about
+
+function setBackupStatus(message) {
+  $('backup-status').textContent = message;
+  $('backup-status').hidden = !message;
+}
+
+/** On whichever screen the restore was started from. */
+function showRestoreError(message) {
+  for (const id of ['backup-error', 'setup-error']) {
+    $(id).textContent = message;
+    $(id).hidden = !message;
+  }
+}
+
+$('backup-save').addEventListener('click', () => {
+  showRestoreError('');
+  const { name, text } = backupFile(data, startOfToday());
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Give the download time to start before letting go of the file.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  // The browser may still ask where to save it, so don't claim it is saved.
+  setBackupStatus(`Downloading ${name}. Keep it somewhere outside this browser, like a cloud drive or an email to yourself.`);
+  keepData();
+});
+
+for (const button of document.querySelectorAll('[data-restore]')) {
+  button.addEventListener('click', () => {
+    restoreOpener = button;
+    setBackupStatus('');
+    showRestoreError('');
+    $('restore-file').value = ''; // so picking the same file again still counts
+    $('restore-file').click();
+  });
+}
+
+$('restore-file').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const tooBig = sizeError(file.size);
+  if (tooBig) return showRestoreError(tooBig);
+
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    return showRestoreError('Couldn’t read that file. Try again.');
+  }
+  const backup = readBackup(text);
+  if (backup.error) return showRestoreError(backup.error);
+
+  // Nothing here to lose: restore straight away. Otherwise check first.
+  if (hasData(data)) askBeforeRestoring(backup);
+  else restore(backup);
+});
+
+function askBeforeRestoring(backup) {
+  pendingRestore = backup;
+  const on = exportedOn(backup.exported);
+  $('restore-from').textContent = on ? `The backup, from ${on}` : 'The backup';
+  $('restore-new').textContent = summary(backup.data);
+  $('restore-old').textContent = summary(data);
+  $('restore-dialog').returnValue = ''; // only Replace sets it
+  $('restore-dialog').showModal();
+}
+
+$('restore-dialog').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.close();
+});
+
+$('restore-dialog').addEventListener('close', () => {
+  const backup = pendingRestore;
+  pendingRestore = null;
+  if (backup && $('restore-dialog').returnValue === 'replace') restore(backup);
+  else focusAfterRestore();
+});
+
+function restore({ data: restored, exported }) {
+  update(restored);
+  // A different set of chapters: offer the color they use least.
+  pickColor('chapter-color', nextChapterColor(data.chapters));
+  const on = exportedOn(exported);
+  setBackupStatus(`Restored your backup${on ? ` from ${on}` : ''}: ${summary(data)}.`);
+  focusAfterRestore();
+}
+
+/** Back to the Restore button, or, if restoring moved on from its screen, to the new one's heading. */
+function focusAfterRestore() {
+  const opener = restoreOpener;
+  restoreOpener = null;
+  if (opener?.isConnected && !opener.closest('[hidden]')) opener.focus();
+  else focusHeading();
+}
+
 // ---- Switching screens -----------------------------------------------------
 
-window.addEventListener('hashchange', () => {
-  if ($('share-dialog').open) $('share-dialog').close();
-  hidePopover();
-  showBirthdayError('');
-  showChapterError(null);
-  showEventError(null);
-  shownBirthday = null; // show what is saved, not a half-typed date
-  render();
-  window.scrollTo(0, 0);
-
+function focusHeading() {
   const screen = currentScreen();
   const heading =
     screen === 'settings' ? 'settings-title' : $('weeks-view').hidden ? 'setup-title' : 'weeks-title';
   $(heading).focus({ preventScroll: true });
+}
+
+window.addEventListener('hashchange', () => {
+  if ($('share-dialog').open) $('share-dialog').close();
+  if ($('restore-dialog').open) $('restore-dialog').close();
+  hidePopover();
+  showBirthdayError('');
+  showChapterError(null);
+  showEventError(null);
+  setBackupStatus('');
+  showRestoreError('');
+  shownBirthday = null; // show what is saved, not a half-typed date
+  render();
+  window.scrollTo(0, 0);
+  focusHeading();
 });
 
 // ---- Keep in sync ----------------------------------------------------------
@@ -730,6 +855,17 @@ window.addEventListener('storage', (e) => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') render();
 });
+
+// ---- About ------------------------------------------------------------------
+
+// The author's photo is copied into the site when it is deployed. Running
+// locally, or if that copy failed, hide the broken image so the initials
+// underneath show. It may have failed before this module ran.
+function hideMissingPhoto() {
+  $('me-photo').hidden = true;
+}
+$('me-photo').addEventListener('error', hideMissingPhoto);
+if ($('me-photo').complete && !$('me-photo').naturalWidth) hideMissingPhoto();
 
 buildColorPicker('chapter-colors', 'chapter-color', nextChapterColor(data.chapters));
 buildColorPicker('event-colors', 'event-color', DEFAULT_COLOR);
