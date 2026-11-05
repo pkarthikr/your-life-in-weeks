@@ -54,6 +54,21 @@ export const FORMATS = Object.freeze({
   }),
 });
 
+/**
+ * The site's own link preview: the picture that shows when someone posts
+ * the site's address. It has no Share button. scripts/link-preview.mjs draws
+ * it once, from a sample life, into site/link-preview.png, which index.html
+ * names in its og:image tag. 1200 × 630 (1.91:1) is the size link previews
+ * are made for. Its text is kept small, since every pixel of height it takes
+ * comes off the 52 weeks of each year.
+ */
+export const PREVIEW = Object.freeze({
+  id: 'preview', name: 'Link preview', sizedFor: 'link previews',
+  width: 1200, height: 630, years: 'columns',
+  margin: { top: 40, bottom: 40, side: 64 },
+  type: { eyebrow: 20, title: 52, year: 14, legend: 20, footer: 18 }, titleLines: 1, footerBeside: true,
+});
+
 const SANS = "'Geist', system-ui, sans-serif";
 const MONO = "'Geist Mono', ui-monospace, monospace";
 const MARK = { square: 7, gap: 3, text: 14 }; // the brand mark before the eyebrow
@@ -66,6 +81,21 @@ export const PICTURE_FONTS = [`500 60px ${SANS}`, `400 24px ${SANS}`, `400 24px 
 
 const fmtInt = (n) => n.toLocaleString('en-US');
 const weeks = (n) => `${fmtInt(n)} ${n === 1 ? 'week' : 'weeks'}`;
+
+/** The theme tokens drawPicture's `colors` are read from, besides the important-week shades and the halo. */
+const THEME_TOKENS = ['bg', 'text', 'ink', 'muted', 'future', 'now', 'nowA'];
+
+/**
+ * drawPicture's `colors` for a theme. `token(name)` gives the value of the
+ * page's CSS custom property `--name` in that theme.
+ */
+export function pictureColors(token) {
+  return {
+    ...Object.fromEntries(THEME_TOKENS.map((name) => [name, token(name)])),
+    marks: Object.fromEntries(COLORS.map((c) => [c.id, token(`c-${c.id}`)])),
+    halo: (parseFloat(token('halo')) || 30) / 100,
+  };
+}
 
 /** The words on the picture. `stats` is lifeStats(). */
 export function pictureText(stats) {
@@ -288,15 +318,17 @@ function drawMark(ctx, x, y, colors) {
  *   the shade of each important-week color by id (from colors.js); and
  *   `halo`, how opaque (0–1) the ring around an important week is
  * - `site`: the address to print at the bottom, or ''
+ * - `text`: the words, shaped like pictureText(stats), which they default
+ *   to: the eyebrow, then the title's two parts, `lived` in the text color
+ *   and `ahead` muted
  *
  * Important weeks show in their colors but their labels are left off: the
  * picture is meant to be posted, the labels are private. The week you were
  * born is ringed in the this-week color, as on the page.
  */
-export function drawPicture(ctx, { format = FORMATS.story, stats, events, colors, site = '' }) {
+export function drawPicture(ctx, { format = FORMATS.story, stats, events, colors, site = '', text = pictureText(stats) }) {
   const layout = pictureLayout(format, { years: stats.years, footer: Boolean(site) });
   const { grid } = layout;
-  const text = pictureText(stats);
 
   ctx.fillStyle = colors.bg;
   ctx.fillRect(0, 0, layout.width, layout.height);

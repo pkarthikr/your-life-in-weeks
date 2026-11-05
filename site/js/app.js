@@ -25,7 +25,7 @@ import {
 import { STORAGE_KEY, load, save } from './storage.js';
 import { birthdayError, eventError, lastCalendarDay, addEvent, removeEvent } from './settings.js';
 import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
-import { FORMATS, PICTURE_FONTS, drawPicture, pictureText, siteAddress } from './picture.js';
+import { FORMATS, PICTURE_FONTS, drawPicture, pictureColors, pictureText, siteAddress } from './picture.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -370,8 +370,6 @@ $('event-list').addEventListener('click', (e) => {
 // where the browser can, to share it straight to an app). All of it happens
 // in the browser; nothing is uploaded.
 
-const THEME_COLORS = ['bg', 'text', 'ink', 'muted', 'future', 'now', 'nowA'];
-
 let picture = null; // { url, file } for the picture on show
 let pictureRun = 0; // bumped on every open and close, so a late picture is dropped
 let pictureOpener = null; // the format button that opened the dialog
@@ -397,12 +395,7 @@ function buildFormatButtons() {
 /** The current theme's colours, read from the same tokens the page uses. */
 function themeColors() {
   const css = getComputedStyle(document.documentElement);
-  const token = (name) => css.getPropertyValue(`--${name}`).trim();
-  return {
-    ...Object.fromEntries(THEME_COLORS.map((name) => [name, token(name)])),
-    marks: Object.fromEntries(COLORS.map((c) => [c.id, token(`c-${c.id}`)])),
-    halo: (parseFloat(token('halo')) || 30) / 100,
-  };
+  return pictureColors((name) => css.getPropertyValue(`--${name}`).trim());
 }
 
 async function makePicture(format) {
