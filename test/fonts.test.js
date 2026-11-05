@@ -6,11 +6,12 @@ const site = new URL('../site/', import.meta.url);
 const html = readFileSync(new URL('index.html', site), 'utf8');
 const css = readFileSync(new URL('styles.css', site), 'utf8');
 
-// What the page loads: <link href>, <script src> and url() in the stylesheet.
-// (Plain <a href> links are not loaded, so they are left out.)
+// What the page loads: <link href>, <script src>, <img src> and url() in the
+// stylesheet. (Plain <a href> links are not loaded, so they are left out.)
 const loadedByHtml = [
   ...[...html.matchAll(/<link\b[^>]*\bhref="([^"]+)"/g)].map((m) => m[1]),
   ...[...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]),
+  ...[...html.matchAll(/<img\b[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]),
 ];
 const loadedByCss = [...css.matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g)].map((m) => m[1]);
 

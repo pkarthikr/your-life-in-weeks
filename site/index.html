@@ -141,6 +141,26 @@
       <p class="lab" id="share-needs-birthday" hidden>Add your birthday first.</p>
     </section>
 
+    <!-- About: who made this, and where the idea comes from. The photo is
+         the author's Gravatar, copied into the site when it is deployed
+         (see .github/workflows/pages.yml), so the page still loads nothing
+         from other sites. Without it, the initials underneath show. -->
+    <section class="card" aria-labelledby="s-about">
+      <h2 id="s-about" class="h2">About</h2>
+      <div class="me">
+        <span class="me-pic">
+          <span aria-hidden="true">KR</span>
+          <img id="me-photo" src="me.jpg" alt="" width="56" height="56" decoding="async">
+        </span>
+        <div class="me-text">
+          <p class="me-name">Karthik Ragubathy</p>
+          <p class="me-bio">I work at Amazon in Seattle, and made Life in Weeks on the side.</p>
+          <a class="link me-blog" href="https://pkarthikr.in">Read my blog at pkarthikr.in</a>
+        </div>
+      </div>
+      <p class="credit">Based on Tim Urban's <a class="link" href="https://waitbutwhy.com/2014/05/life-weeks.html">Your Life in Weeks</a> on Wait But Why, where the idea of one square per week comes from.</p>
+    </section>
+
     <div class="settings-foot">
       <p class="note">Everything here is saved only in this browser. Nothing is sent anywhere.</p>
       <a class="btn" href="#weeks">See my weeks</a>

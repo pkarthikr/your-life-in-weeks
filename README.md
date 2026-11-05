@@ -13,7 +13,7 @@ Life in Weeks is a static web page. There is no server, no database and no accou
 - A different browser or device starts fresh. Clearing this site's data in your browser deletes everything.
 - The share pictures (Settings → **Share your weeks**) are drawn in your browser too. Nothing is uploaded; you save or share the picture yourself.
 
-The only network requests are for the page's own files. That includes the Geist fonts, which are served with the site rather than from Google Fonts.
+The only network requests are for the page's own files. That includes the Geist fonts, which are served with the site rather than from Google Fonts, and the author's photo in Settings → **About**, which is copied from Gravatar when the site is deployed (see below) so your browser never contacts Gravatar.
 
 ## Run it locally
 
@@ -39,6 +39,8 @@ npm test
 
 `.github/workflows/pages.yml` runs the tests on every push and pull request. On the default branch, it then publishes `site/` to GitHub Pages.
 
+Before uploading `site/`, the deploy copies the author's Gravatar into it as `site/me.jpg`. The workflow holds the SHA-256 hash Gravatar looks the picture up by, not the email address. If the download fails, the deploy still goes ahead and the About card shows initials instead; it does the same when you run the site locally, since `me.jpg` isn't in the repository.
+
 One-time setup: in the repository on GitHub, go to **Settings → Pages**. Under **Build and deployment**, set **Source** to **GitHub Actions**. Then push to the default branch, or run the workflow by hand from the **Actions** tab. The site appears at `https://<owner>.github.io/<repo>/`.
 
 ## Project layout
@@ -48,6 +50,7 @@ site/            the whole app, served as-is
   index.html     page markup
   styles.css     styles and the light and dark theme tokens
   favicon.svg
+  me.jpg         the author's photo, added by the deploy (not in the repository)
   fonts/         Geist and Geist Mono (woff2), with their license in OFL.txt
   js/app.js      rendering and events for the Weeks and Settings screens
   js/weeks.js    pure date math for the grid (no DOM)
@@ -65,6 +68,7 @@ Both screens are on one page; the address picks which one shows, so the browser'
 - **Weeks** (`#weeks`, the default): the 100-year grid. Important weeks show in the color you picked for them; hover one for details. If two important dates fall in the same week, the square takes the earlier one's color. The week you were born, the first square, has a ring in the this-week color; hover it to see your birthday. If it is also an important week, it keeps that week's color inside the ring. Before a birthday is saved, it asks you to add one.
 - **Settings** (`#settings`): your birthday, the light or dark theme, and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
   - **Share your weeks** makes a PNG of your whole grid in your current theme, sized for where you'll post it. Save it, or, where the browser supports sharing files (most phones), share it straight to the app. It needs a birthday first.
+  - **About** is a short note on who made the site, with a link to the author's blog, and a link to Tim Urban's original [Your Life in Weeks](https://waitbutwhy.com/2014/05/life-weeks.html) post on Wait But Why. The name, line about the author and blog link are in `index.html`; the photo's Gravatar hash is in `.github/workflows/pages.yml`.
 
 ### Share pictures
 
