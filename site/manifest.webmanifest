@@ -1,0 +1,15 @@
+{
+  "name": "Life in Weeks",
+  "short_name": "Life in Weeks",
+  "description": "Your whole life on one page, one square per week. Your birthday, chapters and important weeks are saved only on this device.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0F1012",
+  "theme_color": "#0F1012",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

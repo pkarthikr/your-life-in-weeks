@@ -57,6 +57,7 @@ import { COLORS, DEFAULT_COLOR, weekColor } from './colors.js';
 import { FORMATS, PICTURE_FONTS, drawPicture, pictureColors, pictureText, siteAddress } from './picture.js';
 import { hasData, backupFile, sizeError, readBackup, summary, exportedOn } from './backup.js';
 import { fitCells } from './fit.js';
+import { installWay, keepsOwnData } from './install.js';
 
 const $ = (id) => document.getElementById(id);
 const fmtInt = (n) => n.toLocaleString('en-US');
@@ -113,6 +114,8 @@ function currentScreen() {
 
 function render() {
   document.documentElement.className = `t-${data.theme}`;
+  // The installed app's title or status bar takes the theme's background.
+  $('theme-color').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
 
   const screen = currentScreen();
   const today = startOfToday();
@@ -319,6 +322,8 @@ function renderSettings(birth, today) {
   // A backup needs something in it. Restoring works any time.
   $('backup-save').disabled = !hasData(data);
   $('backup-empty').hidden = hasData(data);
+
+  renderInstall();
 }
 
 /** One row of a list in Settings: a swatch, a label, a line under it, and edit and remove buttons. */
@@ -1038,6 +1043,63 @@ function focusAfterRestore() {
   else focusHeading();
 }
 
+// ---- Install as an app ------------------------------------------------------
+//
+// The site can be installed like an app (manifest.webmanifest, with sw.js so
+// it opens offline). Each browser does it its own way (js/install.js): Chrome
+// and Edge show their prompt from the Install button; elsewhere Settings
+// says where to look.
+
+let installPrompt = window.liwInstallPrompt ?? null; // Chrome's or Edge's prompt, until it is used
+let installed = false; // installed from this page, this visit
+const standaloneQuery = matchMedia('(display-mode: standalone)');
+
+function renderInstall() {
+  const way = installWay({
+    standalone: standaloneQuery.matches || navigator.standalone === true,
+    installed,
+    canPrompt: installPrompt !== null,
+    userAgent: navigator.userAgent,
+    maxTouchPoints: navigator.maxTouchPoints,
+  });
+  $('install-card').hidden = way === 'app';
+  for (const how of document.querySelectorAll('[data-install]')) how.hidden = how.dataset.install !== way;
+  // On iPhone, iPad and Mac the app starts empty; say how to bring the weeks along.
+  $('install-own-copy').hidden = !(keepsOwnData(way) && hasData(data));
+}
+
+// The browser can install the site now (or again, after a refusal). The
+// script in index.html keeps one that came before this module ran.
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installPrompt = e;
+  render();
+});
+
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  installed = true;
+  render();
+});
+
+// Chrome on a computer moves the tab into the app's own window once installed.
+standaloneQuery.addEventListener?.('change', render);
+
+$('install-app').addEventListener('click', async () => {
+  const prompt = installPrompt;
+  if (!prompt) return;
+  installPrompt = null; // each prompt can only be shown once
+  try {
+    await prompt.prompt();
+    if ((await prompt.userChoice).outcome === 'accepted') installed = true;
+  } catch {
+    // It couldn't be shown; the browser's menu still has it.
+  }
+  render();
+  // The button has gone; move to what took its place.
+  document.querySelector('[data-install]:not([hidden])')?.focus();
+});
+
 // ---- Switching screens -----------------------------------------------------
 
 function focusHeading() {
@@ -1092,3 +1154,7 @@ buildColorPicker('chapter-colors', 'chapter-color', nextChapterColor(data.chapte
 buildColorPicker('event-colors', 'event-color', DEFAULT_COLOR);
 buildFormatButtons();
 render();
+
+// Keep a copy of the site's files so it opens offline, as an installed app
+// should (sw.js). Browsers allow it only over https and on localhost.
+navigator.serviceWorker?.register('sw.js').catch(() => {});
