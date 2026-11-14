@@ -13,6 +13,7 @@ Life in Weeks is a static web page. There is no server, no database and no accou
 - A different browser or device starts fresh. Clearing this site's data in your browser deletes everything. Some browsers clear it for you: Safari deletes a site's saved data after seven days of use without a visit.
 - So Settings → **Backup** can download everything as a JSON file, and restore it in any browser, on any device. The file goes from your browser to you and back; nothing is uploaded. See [Backups](#backups).
 - The share pictures (Settings → **Share your weeks**) are drawn in your browser too. Nothing is uploaded; you save or share the picture yourself.
+- The site can be installed as an app (Settings → **Install as an app**), and opens without a connection. For that, the browser keeps a copy of the site's own files (never your data). See [Install as an app](#install-as-an-app).
 
 The only network requests are for the page's own files. That includes the Geist fonts, which are served with the site rather than from Google Fonts, and the author's photo in Settings → **About**, which is copied from Gravatar when the site is deployed (see below) so your browser never contacts Gravatar.
 
@@ -30,7 +31,7 @@ That runs `python3 -m http.server 8000 --directory site`. Then open http://local
 
 ## Tests
 
-The date math (including where chapters fall), the Settings rules, the Fit to screen sizing, the share pictures' layout and drawing, the storage layer, the backup files and the link-preview tags have unit tests that use Node's built-in test runner (Node 20 or later):
+The date math (including where chapters fall), the Settings rules, the Fit to screen sizing, the share pictures' layout and drawing, the storage layer, the backup files, the link-preview tags, and the install instructions, manifest, icons and offline copy have unit tests that use Node's built-in test runner (Node 20 or later):
 
 ```bash
 npm test
@@ -53,6 +54,9 @@ site/            the whole app, served as-is
   index.html     page markup
   styles.css     styles and the light and dark theme tokens
   favicon.svg
+  manifest.webmanifest  the app's name, colors and icons, for installing it
+  sw.js          the service worker: keeps a copy of the site's files so it opens offline
+  icons/         the app's icons, drawn by scripts/app-icons.mjs
   me.jpg         the author's photo, added by the deploy (not in the repository)
   link-preview.png  the picture link previews show, drawn by scripts/link-preview.mjs
   fonts/         Geist and Geist Mono (woff2), with their license in OFL.txt
@@ -66,9 +70,11 @@ site/            the whole app, served as-is
   js/life-expectancy.js  WHO life expectancy at birth by country and sex (generated)
   js/storage.js  localStorage read/write, and asking the browser to keep it
   js/backup.js   backup files: writing them and checking them before a restore (no DOM)
+  js/install.js  which way this browser installs the site as an app (no DOM)
 scripts/
   life-expectancy.mjs  rebuilds js/life-expectancy.js from the WHO API (npm run life-expectancy)
   link-preview.mjs  draws site/link-preview.png (needs Playwright)
+  app-icons.mjs  draws site/icons/ (needs Playwright)
 test/            unit tests (node --test)
 ```
 
@@ -86,6 +92,7 @@ Both screens are on one page; the address picks which one shows, so the browser'
 - **Settings** (`#settings`): your birthday, your life span (below), the light or dark theme, your chapters (add when one began, when it ended or nothing if it's still going, a name and a color, or remove one), and your important weeks (add a date, what happened and a color, or remove one). Every change is saved straight away, in this browser only.
   - **Share your weeks** makes a PNG of your whole grid in your current theme, sized for where you'll post it. Save it, or, where the browser supports sharing files (most phones), share it straight to the app. It needs a birthday first.
   - **Backup** downloads everything as a file, or restores one. See below.
+  - **Install as an app** puts the site on a phone's home screen or a computer's dock or app list. See below. The installed app doesn't show this card.
   - **About** is a short note on who made the site, with a link to the author's blog, and a link to Tim Urban's original [Your Life in Weeks](https://waitbutwhy.com/2014/05/life-weeks.html) post on Wait But Why. The name, line about the author and blog link are in `index.html`; the photo's Gravatar hash is in `.github/workflows/pages.yml`.
 
 ### Chapters
@@ -136,6 +143,27 @@ To add a format, add an entry to `FORMATS` in `js/picture.js` (its size, margins
 When you first save something on a visit, the app also calls `navigator.storage.persist()`, which asks the browser not to clear the site's data. It is only a request. Firefox asks you. Chrome and Safari decide for themselves from how you use the site, and Safari mostly agrees only for sites added to the Home Screen. That's why the backup file, not `persist()`, is the dependable copy. It is asked when you save rather than when the page loads, so Firefox's question follows something you did.
 
 To change the file's shape, bump `BACKUP_VERSION` in `js/backup.js`, and keep `readBackup` reading the older versions.
+
+### Install as an app
+
+The site is a Progressive Web App (PWA): it can be installed like an app, with its own icon, and it opens in its own window, without a connection. Settings → **Install as an app** shows the way that works in the browser in use (`js/install.js`):
+
+| Browser | How |
+|---|---|
+| Chrome, Edge, Samsung Internet | An **Install app** button opens the browser's own prompt. The page holds the prompt back on load (it would otherwise show as a banner), so installing is only offered here and in the browser's menu. |
+| iPhone and iPad (Safari, or any browser there) | Steps: Share, then **Add to Home Screen** |
+| Safari on a Mac (17 and later) | **File → Add to Dock** |
+| Anything else | Look in the browser's menu; not every browser can install sites |
+
+On iPhone, iPad and Mac, an installed app keeps its own `localStorage`, apart from the browser's, so it starts empty. When there is something saved, the card says so and points to Backup: download one in the browser, then restore it in the app. Chrome's and Edge's apps share the browser's data, so nothing needs moving.
+
+Three files make the site installable:
+
+- `manifest.webmanifest` gives the app's name, colors and icons. Its addresses are relative, so it works wherever the site is served from.
+- `icons/` holds the icons: a rounded square for computers, one that fills its square for Android to cut to shape (`maskable`), and the Apple touch icon. They are the favicon's design, drawn by `npm run app-icons` (with Playwright, as for the link preview). Redraw them after changing the favicon or the dark theme's colors.
+- `sw.js`, the service worker, keeps a copy of the site's files in the browser's Cache Storage. It goes to the network first, so a new version shows straight away. If the network fails or takes more than 3 seconds, it uses the copy. It copies the files the page needs to start when it is installed (`FILES`), and anything else the first time it is loaded. Add a new file the page loads to `FILES`; a test checks that none is missing and that each exists. The service worker never sees your weeks, since it can't read `localStorage`.
+
+`theme-color` follows the chosen theme, so the installed app's title or status bar matches the page.
 
 ### Link previews
 

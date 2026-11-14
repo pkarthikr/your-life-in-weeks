@@ -8,6 +8,7 @@
     "start": "python3 -m http.server 8000 --directory site",
     "test": "node --test",
     "link-preview": "node scripts/link-preview.mjs",
+    "app-icons": "node scripts/app-icons.mjs",
     "life-expectancy": "NODE_USE_ENV_PROXY=1 node scripts/life-expectancy.mjs"
   },
   "engines": {

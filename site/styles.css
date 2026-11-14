@@ -810,7 +810,8 @@ a { color: inherit; }
 
 /* ---- Backup ------------------------------------------------------------ */
 
-.backup-actions {
+.backup-actions,
+.install-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -847,8 +848,34 @@ a { color: inherit; }
 
 @media (max-width: 520px) {
   /* Side by side when they fit, else one per line, full width. */
-  .backup-actions .btn { flex: 1 1 auto; }
+  .backup-actions .btn,
+  .install-actions .btn { flex: 1 1 auto; }
 }
+
+/* ---- Install as an app ------------------------------------------------- */
+
+/* Where to tap or click in this browser (js/install.js). */
+.how {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Focused when it takes the Install button's place; that needs no ring. */
+.how:focus { outline: none; }
+
+.how strong { font-weight: 600; }
+
+.steps {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.steps li { padding-left: 4px; }
+
+.steps svg { vertical-align: -2px; }
 
 /* Phones: keep the tiny cells square. */
 @media (max-width: 520px) {
